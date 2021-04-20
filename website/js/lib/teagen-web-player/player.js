@@ -22,6 +22,8 @@ export const zip2proj = async file => {
 }
 
 const blobUrls = [];
+/** @type {HTMLIFrameElement} */
+let playFrame;
 /** @type {AudioContext} */
 let audioContext;
 /** @type {AudioWorkletNode} */
@@ -31,8 +33,42 @@ const processorId = (() => {
 	return () => ++count;
 })();
 
+export const stop = async () => {
+	if (mainNode) {
+		mainNode.disconnect();
+		mainNode = undefined;
+	}
+	if (audioContext) {
+		audioContext.close();
+		audioContext = undefined;
+	}
+	if (playFrame) {
+		playFrame.remove();
+		playFrame = undefined;
+	}
+};
+
+const runInFrame = (type, content) => {
+	const ele = playFrame.contentDocument.createElement('script');
+	ele.type = type;
+	ele.textContent = content;
+	playFrame.contentDocument.body.append(ele);
+};
+
 /** @param {Project} proj */
 export const play = async proj => {
+	stop();
+	playFrame = document.createElement('iframe');
+	playFrame.style.display = 'none';
+	document.body.appendChild(playFrame);
+	console.log(playFrame.contentDocument.readyState);
+	await new Promise((resolve, reject) => {
+		if (playFrame.contentDocument.readyState == 'complete')
+			resolve();
+		else
+			playFrame.onload = resolve;
+	});
+	console.log(playFrame.contentDocument.readyState);
 	blobUrls.forEach(url => URL.revokeObjectURL(url));
 	blobUrls.length = 0;
 	let mainUrl;
@@ -41,33 +77,73 @@ export const play = async proj => {
 		const url = URL.createObjectURL(new Blob([module.content], {type: 'application/javascript'}));
 		blobUrls.push(url);
 		if (module.path == 'main.js') mainUrl = url;
-		mapObj['/'+module.path] = url;
+		mapObj[module.path] = url;
 	}
+	if (!mainUrl) throw new Error('Could not find main.js in the project.');
 	const scopes = {};
 	for (let url of blobUrls) {
-		scopes[url] = Object.assign({}, mapObj);
+		scopes[url] = Object.assign({}, mapObj); // why am i cloning it every time?
 	}
-	const mapEle = document.createElement('script');
-	mapEle.type = 'importmap';
-	mapEle.textContent = JSON.stringify({scopes});
-	document.body.append(mapEle);
-
-	if (!mainUrl) throw new Error('Could not find main.js in the project.');
-	const preRun = await import(mainUrl);
-	const sampleRate = preRun.sampleRate ?? 44100;
-	if (!preRun.process) throw new Error('main.js must export a "process" function!');
-	const preOut = preRun.process(0);
+	runInFrame('importmap', JSON.stringify({
+		imports: Object.assign({}, mapObj), // ??? // also i don't think you need "imports"
+		scopes
+	}));
+	const messageData = await new Promise((resolve, reject) => {
+		window.addEventListener('message', event => {
+			resolve(event.data);
+		}, {once : true});
+		runInFrame('module', `
+		(async () => {
+			let preRunModule;
+			try {
+				console.log('prerun 1');
+				preRunModule = await import('${mainUrl}');
+				console.log('prerun 2');
+			} catch (e) {
+				window.parent.postMessage({
+					type: 'preRunComplete',
+					success: false,
+					errObj: e
+				}, '*');
+				return;
+			}
+			if (!preRunModule.process) window.parent.postMessage({
+				type: 'preRunComplete',
+				success: false,
+				info: 'main.js must export a "process" function!'
+			}, '*');
+			const preOut = preRunModule.process(0);
+			window.parent.postMessage({
+				type: 'preRunComplete',
+				success: true,
+				preOut,
+				sampleRate: preRunModule.sampleRate
+			}, '*');
+		})();
+		`);
+	});
+	if (messageData.type !== 'preRunComplete') {
+		throw new Error('Got wrong message from play frame!');
+	} else if (!messageData.success && messageData.errObj) {
+		throw messageData.errObj;
+	} else if (!messageData.success) {
+		throw new Error(messageData.info);
+	};
+	const sampleRate = messageData.sampleRate ?? 44100;
+	const preOut = messageData.preOut;
 	let processWrapper;
 	if (typeof preOut === 'number') {
 		processWrapper = `
 		const s = process(this.samplePos++);
 		channels[0][i] = s;
 		channels[1][i] = s;`;
+		console.log('preRun returned mono signal.');
 	} else if (Array.isArray(preOut) && preOut.length === 2) {
 		processWrapper = `
 		const [s1, s2] = process(this.samplePos++);
 		channels[0][i] = s1;
 		channels[1][i] = s2;`;
+		console.log('preRun returned stereo signal.');
 	} else throw new Error('process must return a number or an array of two numbers!');
 	const processorName = 'MainProcessor' + processorId();
 	const shim = `
@@ -87,25 +163,21 @@ export const play = async proj => {
 	}
 	registerProcessor('${processorName}', MainProcessor);`;
 	const shimUrl = URL.createObjectURL(new Blob([shim], {type: 'application/javascript'}));
-	stop();
 	if (audioContext && audioContext.sampleRate !== sampleRate) {
 		audioContext.close();
 		audioContext = undefined;
 	}
-	if (!audioContext) audioContext = new AudioContext({sampleRate});
-	if (audioContext.sampleRate !== sampleRate)
-		throw new Error(`Tried to set samplerate to ${sampleRate}, got ${audioContext.sampleRate} instead.`);
-	await audioContext.audioWorklet.addModule(shimUrl);
-	mainNode = new AudioWorkletNode(audioContext, processorName, {
-		numberOfInputs: 0,
-		outputChannelCount: [2]
-	});
-	mainNode.connect(audioContext.destination);
-};
-
-export const stop = async () => {
-	if (!audioContext) return;
-	if (!mainNode) return;
-	mainNode.disconnect();
-	mainNode = undefined;
+	runInFrame('application/javascript', `
+	(async () => {
+		const audioContext = new AudioContext({sampleRate: ${sampleRate}});
+		if (audioContext.sampleRate !== ${sampleRate})
+			throw new Error('Tried to set samplerate to ${sampleRate}, got '+audioContext.sampleRate+' instead.');
+		await audioContext.audioWorklet.addModule('${shimUrl}');
+		const mainNode = new AudioWorkletNode(audioContext, '${processorName}', {
+			numberOfInputs: 0,
+			outputChannelCount: [2]
+		});
+		mainNode.connect(audioContext.destination);
+	})();
+	`);
 };
