@@ -27,7 +27,9 @@ editor.addShortcut('Alt+RightArrow', 'Next File', () => {
 	m.redraw();
 });
 
-const monacoURL = 'http://localhost/miniweb/js/lib/monaco/min';
+const url = window.location.href;
+const urlBase = url.substring(0, url.lastIndexOf('/')+1);
+const monacoURL = urlBase+'js/lib/monaco/min';
 
 const makeRenamer = ({obj, getValue, setValue}) => {
 	const renameHandler = input => {

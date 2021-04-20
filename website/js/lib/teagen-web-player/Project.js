@@ -1,8 +1,6 @@
 // presumably this module could be used in non-browser contexts
 // so let's not use Web APIs in here
 
-import { nextImportStatement, allImportStatements, topologicalSort, } from './importMapping.js';
-
 const fileId = (() => {
 	let count = 100; // fail fast if array index is used instead of id
 	return () => ++count;
@@ -53,14 +51,5 @@ export class Project {
 	/** @return {Array.<ProjFile>} */
 	getFiles() {
 		return this.files;
-	}
-	copySortedModules() {
-		const graph = [];
-		for (let file of this.files) {
-			const statements = allImportStatements(file.path, file.content);
-			graph[file.path] = [...new Set(statements.map(s => s.imported))];
-		}
-		const sortedPaths = topologicalSort(graph);
-		return sortedPaths.map(path => ({path, content: this.getContentByPath(path)}));
 	}
 }

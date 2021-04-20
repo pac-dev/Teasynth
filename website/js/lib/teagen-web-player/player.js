@@ -1,6 +1,5 @@
 import { JSZip } from './lib/jszipModule.js';
 import { Project } from './Project.js';
-import { nextImportStatement } from './importMapping.js';
 
 /** @param {Project} proj */
 export const proj2zip = async proj => {
@@ -37,22 +36,22 @@ export const play = async proj => {
 	blobUrls.forEach(url => URL.revokeObjectURL(url));
 	blobUrls.length = 0;
 	let mainUrl;
-	const modules = proj.copySortedModules();
-	for (let i = 0; i < modules.length; i++) {
-		const blobMod = modules[i];
-		const url = URL.createObjectURL(new Blob([blobMod.content], {type: 'application/javascript'}));
-		if (blobMod.path == 'main.js') mainUrl = url;
-		for (let j = i+1; j < modules.length; j++) {
-			const importer = modules[j];
-			let statement, lastIndex = 0;
-			while (statement = nextImportStatement(importer.path, importer.content, lastIndex)) {
-				importer.content = 
-					importer.content.substring(0, statement.pathIndex) + url +
-					importer.content.substring(statement.pathIndex + statement.pathLength);
-				lastIndex = statement.pathIndex;
-			}
-		}
+	const mapObj = {};
+	for (let module of proj.getFiles()) {
+		const url = URL.createObjectURL(new Blob([module.content], {type: 'application/javascript'}));
+		blobUrls.push(url);
+		if (module.path == 'main.js') mainUrl = url;
+		mapObj['/'+module.path] = url;
 	}
+	const scopes = {};
+	for (let url of blobUrls) {
+		scopes[url] = Object.assign({}, mapObj);
+	}
+	const mapEle = document.createElement('script');
+	mapEle.type = 'importmap';
+	mapEle.textContent = JSON.stringify({scopes});
+	document.body.append(mapEle);
+
 	if (!mainUrl) throw new Error('Could not find main.js in the project.');
 	const preRun = await import(mainUrl);
 	const sampleRate = preRun.sampleRate ?? 44100;
