@@ -1,7 +1,7 @@
 import { CodeEditor } from './codeEditor.js';
 import { m } from './lib/mithrilModule.js';
 import { Project } from './lib/teagen-web-player/Project.js';
-import { proj2zip, zip2proj, play, stop } from './lib/teagen-web-player/player.js';
+import { proj2zip, zip2proj, play, stop, initService } from './lib/teagen-web-player/player.js';
 
 let proj = new Project('Untitled Project');
 proj.addFile('main.js', "console.log('running in bread')");
@@ -30,6 +30,7 @@ editor.addShortcut('Alt+RightArrow', 'Next File', () => {
 const url = window.location.href;
 const urlBase = url.substring(0, url.lastIndexOf('/')+1);
 const monacoURL = urlBase+'js/lib/monaco/min';
+initService(urlBase); // async
 
 const makeRenamer = ({obj, getValue, setValue}) => {
 	const renameHandler = input => {
