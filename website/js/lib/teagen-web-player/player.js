@@ -97,12 +97,17 @@ export const play = async proj => {
 		const s = process(this.samplePos++);
 		channels[0][i] = s;
 		channels[1][i] = s;`;
+	} else if (Array.isArray(preOut) && preOut.length === 1) {
+		processWrapper = `
+		const s = process(this.samplePos++)[0];
+		channels[0][i] = s;
+		channels[1][i] = s;`;
 	} else if (Array.isArray(preOut) && preOut.length === 2) {
 		processWrapper = `
 		const [s1, s2] = process(this.samplePos++);
 		channels[0][i] = s1;
 		channels[1][i] = s2;`;
-	} else throw new Error('process must return a number or an array of two numbers!');
+	} else throw new Error('process must return a number or an array of one or two numbers!');
 	const processorName = 'MainProcessor' + processorId();
 	const shim = `
 	import { process } from '${urlBase}${buildId}/main.js';
