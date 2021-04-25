@@ -35,10 +35,10 @@ addEventListener('message', event => {
 });
 
 self.addEventListener('fetch', e => {
-	for (const [buildId, files] of Object.entries(self.builds)) {
-		const pathPos = e.request.url.indexOf(buildId);
-		if (pathPos === -1) continue;
-		const path = e.request.url.substring(pathPos+buildId.length+1);
+	// e.request.url eg: http://localhost/tg/udxq1q/main.js
+	// registration.scope eg: http://localhost/tg/
+	const path = e.request.url.substring(self.registration.scope.length);
+	for (const files of Object.values(self.builds)) {
 		if (files[path] === undefined) return;
 		const r = new Response(files[path], {headers: {'Content-Type': 'application/javascript'}});
 		e.respondWith(r);

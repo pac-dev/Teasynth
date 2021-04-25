@@ -84,37 +84,54 @@ export const play = async proj => {
 	await serviceCommand({
 		type: 'addBuild', buildId,
 		files: Object.fromEntries(proj.getFiles().map(f => [
-			f.path, f.content
+			buildId+'/'+f.path, f.content
 		]))
 	});
 	const preRun = await import(`${urlBase}${buildId}/main.js`);
 	const sampleRate = preRun.sampleRate ?? 44100;
 	if (!preRun.process) throw new Error('main.js must export a "process" function!');
-	const preOut = preRun.process(0);
+	let preOut = await preRun.process();
+	let isAsync = false;
+	if (typeof preOut === 'function') {
+		preOut = preOut();
+		isAsync = true;
+	}
 	let processWrapper;
 	if (typeof preOut === 'number') {
 		processWrapper = `
-		const s = process(this.samplePos++);
+		const s = this.mainProcess();
 		channels[0][i] = s;
 		channels[1][i] = s;`;
 	} else if (Array.isArray(preOut) && preOut.length === 1) {
 		processWrapper = `
-		const s = process(this.samplePos++)[0];
+		const s = this.mainProcess()[0];
 		channels[0][i] = s;
 		channels[1][i] = s;`;
 	} else if (Array.isArray(preOut) && preOut.length === 2) {
 		processWrapper = `
-		const [s1, s2] = process(this.samplePos++);
+		const [s1, s2] = this.mainProcess();
 		channels[0][i] = s1;
 		channels[1][i] = s2;`;
-	} else throw new Error('process must return a number or an array of one or two numbers!');
+	} else throw new Error('process must return a number or an array of one or two numbers! or, you know, a promise that returns a function that returns one of those things. any questions?');
+	let assignMain;
+	if (isAsync) {
+		assignMain = `
+		this.mainProcess = await process();`;
+	} else {
+		assignMain = `
+		this.mainProcess = process;`;
+	}
 	const processorName = 'MainProcessor' + processorId();
 	const shim = `
 	import { process } from '${urlBase}${buildId}/main.js';
 	class MainProcessor extends AudioWorkletProcessor {
 		constructor(options) {
 			super(options);
-			this.samplePos = 0;
+			this.port.onmessage = async event => {
+				if (event.data !== 'init main') return;
+				${assignMain}
+				this.port.postMessage('main ready');
+			}
 		}
 		process(inputs, outputs, parameters) {
 			const channels = outputs[0];
@@ -137,6 +154,16 @@ export const play = async proj => {
 	mainNode = new AudioWorkletNode(audioContext, processorName, {
 		numberOfInputs: 0,
 		outputChannelCount: [2]
+	});
+	await new Promise(resolve => {
+		const msgListener = event => {
+			if (event.data !== 'main ready') return;
+			mainNode.port.removeEventListener('message', msgListener);
+			resolve();
+		};
+		mainNode.port.addEventListener('message', msgListener);
+		mainNode.port.start();
+		mainNode.port.postMessage('init main');
 	});
 	mainNode.connect(audioContext.destination);
 };
