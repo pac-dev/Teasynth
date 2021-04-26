@@ -8,8 +8,8 @@ proj.addFile('main.js', "console.log('running in bread')");
 proj.addFile('worklet.js', '// hello');
 let editingId = proj.getFiles()[0].id;
 const editor = new CodeEditor(proj);
-editor.addShortcut('Alt+Enter', 'Play', () => play(proj));
-editor.addShortcut('Alt+Space', 'Stop', () => stop());
+editor.addShortcut('CtrlCmd+Enter', 'Play', () => play(proj));
+editor.addShortcut('CtrlCmd+Space', 'Stop', () => stop());
 editor.addShortcut('Alt+LeftArrow', 'Previous File', () => {
 	const files = proj.getFiles();
 	if (files.length < 2) return;

@@ -15,6 +15,7 @@ export const zip2proj = async file => {
 	const entries = [];
 	zip.forEach((path, obj) => entries.push({path, obj}));
 	for (let {path, obj} of entries) {
+		if (obj.dir) continue;
 		const content = await obj.async('string');
 		proj.addFile(path, content);
 	}
@@ -52,8 +53,9 @@ export const initService = async _urlBase => {
 	urlBase = _urlBase;
 	await navigator.serviceWorker.register(urlBase+'importctrl.js');
 	const reg = await navigator.serviceWorker.ready;
-	console.log('Service worker ready');
 	service = reg.active;
+	await serviceCommand({type: 'claim'});
+	console.log('Service worker ready');
 };
 
 const processorId = (() => {
@@ -81,12 +83,19 @@ export const play = async proj => {
 	await stop();
 	buildId = Math.random().toString(36).substring(7);
 	console.log('new build id: '+buildId);
-	await serviceCommand({
-		type: 'addBuild', buildId,
-		files: Object.fromEntries(proj.getFiles().map(f => [
-			buildId+'/'+f.path, f.content
-		]))
-	});
+	const files = Object.fromEntries(proj.getFiles().map(f => [
+		buildId+'/'+f.path, f.content
+	]));
+	let metaFile = `
+	const fileContents = {};
+	export const getFileText = path => fileContents[path];`;
+	for (let file of proj.getFiles()) {
+		metaFile += `
+		fileContents[${JSON.stringify(file.path)}] = ${JSON.stringify(file.content)};
+		`;
+	}
+	files[buildId+'/platform/files.js'] = metaFile;
+	await serviceCommand({ type: 'addBuild', buildId, files});
 	const preRun = await import(`${urlBase}${buildId}/main.js`);
 	const sampleRate = preRun.sampleRate ?? 44100;
 	if (!preRun.process) throw new Error('main.js must export a "process" function!');
@@ -150,6 +159,7 @@ export const play = async proj => {
 	if (!audioContext) audioContext = new AudioContext({sampleRate});
 	if (audioContext.sampleRate !== sampleRate)
 		throw new Error(`Tried to set samplerate to ${sampleRate}, got ${audioContext.sampleRate} instead.`);
+	await audioContext.suspend(); // ensure process doesn't get called before ready
 	await audioContext.audioWorklet.addModule(shimUrl);
 	mainNode = new AudioWorkletNode(audioContext, processorName, {
 		numberOfInputs: 0,
@@ -166,4 +176,5 @@ export const play = async proj => {
 		mainNode.port.postMessage('init main');
 	});
 	mainNode.connect(audioContext.destination);
+	await audioContext.resume();
 };

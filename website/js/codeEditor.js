@@ -1,6 +1,8 @@
 import { loadScript } from "./network.js";
 import { Project, ProjFile } from './lib/teagen-web-player/Project.js';
 
+// always call model.setEOL immediately after model.setValue
+
 export class CodeEditor {
 	/** @param {Project} proj */
 	constructor(proj) {
@@ -46,6 +48,7 @@ export class CodeEditor {
 	addFile(f) {
 		const uri = monaco.Uri.file('/'+f.path);
 		const model = monaco.editor.createModel(f.content, undefined, uri); // 'text/plain'
+		model.setEOL(monaco.editor.EndOfLineSequence.LF);
 		this.fileModels[f.id] = model;
 		model.onDidChangeContent(() => {
 			this.proj.setContent(f.id, model.getValue());

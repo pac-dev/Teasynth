@@ -17,11 +17,6 @@ self.addEventListener('install', e => {
 	self.skipWaiting()
 });
 
-self.addEventListener('activate', () => {
-	console.log('claiming control');
-	return self.clients.claim();
-});
-
 addEventListener('message', event => {
 	// type: 'command', cmdId, cmdData
 	if (event.data.type !== 'command') return;
@@ -31,6 +26,10 @@ addEventListener('message', event => {
 		addBuild(cmdData);
 	else if (cmdData.type === 'removeBuild')
 		removeBuild(cmdData);
+	else if (cmdData.type === 'claim') {
+		console.log('claiming control');
+		return self.clients.claim();
+	}
 	event.source.postMessage({type: 'commandCompleted', cmdId});
 });
 
@@ -39,7 +38,7 @@ self.addEventListener('fetch', e => {
 	// registration.scope eg: http://localhost/tg/
 	const path = e.request.url.substring(self.registration.scope.length);
 	for (const files of Object.values(self.builds)) {
-		if (files[path] === undefined) return;
+		if (files[path] === undefined) continue;
 		const r = new Response(files[path], {headers: {'Content-Type': 'application/javascript'}});
 		e.respondWith(r);
 		return;
