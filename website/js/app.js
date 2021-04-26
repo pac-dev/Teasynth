@@ -114,7 +114,7 @@ const CodeContainer = {
 
 const TopLinks = {
 	view: () => [
-		m('.toplink', {
+		m('.toplink.proj_name', {
 			ondblclick: () => { proj.renaming = true; }
 		}, [
 			proj.name,
@@ -169,8 +169,10 @@ const Tools = {
 
 const Layout = {
 	view: () => m('.layout', [
-		m('.top_pane', m(TopLinks)),
-		m('.file_pane', m(FileList)),
+		m('.project_pane', [
+			m('.project_head', m(TopLinks)),
+			m('.project_files', m(FileList)),
+		]),
 		m('.code_pane', m(CodeContainer)),
 		m('.tool_pane', m(Tools))
 	])
