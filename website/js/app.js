@@ -8,9 +8,9 @@ proj.addFile('main.js', "console.log('running in bread')");
 proj.addFile('worklet.js', '// hello');
 let editingId = proj.getFiles()[0].id;
 const editor = new CodeEditor(proj);
-editor.addShortcut('CtrlCmd+Enter', 'Play', () => play(proj));
-editor.addShortcut('CtrlCmd+Space', 'Stop', () => stop());
-editor.addShortcut('Alt+LeftArrow', 'Previous File', () => {
+editor.addShortcut('Alt+KEY_1', 'Play', () => play(proj));
+editor.addShortcut('Alt+KEY_2', 'Stop', () => stop());
+editor.addShortcut('Alt+KEY_3', 'Previous File', () => {
 	const files = proj.getFiles();
 	if (files.length < 2) return;
 	let currentIdx = files.findIndex(f => f.id == editingId);
@@ -18,7 +18,7 @@ editor.addShortcut('Alt+LeftArrow', 'Previous File', () => {
 	editingId = files[(files.length+currentIdx-1)%files.length].id;
 	m.redraw();
 });
-editor.addShortcut('Alt+RightArrow', 'Next File', () => {
+editor.addShortcut('Alt+KEY_4', 'Next File', () => {
 	const files = proj.getFiles();
 	if (files.length < 2) return;
 	let currentIdx = files.findIndex(f => f.id == editingId);

@@ -1,5 +1,6 @@
 import { loadScript } from "./network.js";
 import { Project, ProjFile } from './lib/teagen-web-player/Project.js';
+import { registerSporth } from './sporthEditor.js';
 
 // always call model.setEOL immediately after model.setValue
 
@@ -18,6 +19,10 @@ export class CodeEditor {
 		this.proj = proj;
 		if (this.ready) this.loadedSetProject();
 	}
+	/**
+	 * refer to https://microsoft.github.io/monaco-editor/api/enums/monaco.keycode.html
+	 * and https://microsoft.github.io/monaco-editor/api/classes/monaco.keymod.html
+	 */
 	addShortcut(shortcut, label, run) {
 		this.shortcuts.push([shortcut, label, run]);
 		if (this.ready) this.loadedAddShortcut(shortcut, label, run);
@@ -47,7 +52,10 @@ export class CodeEditor {
 	/** @param {ProjFile} f */
 	addFile(f) {
 		const uri = monaco.Uri.file('/'+f.path);
-		const model = monaco.editor.createModel(f.content, undefined, uri); // 'text/plain'
+		let lang;
+		if (f.path.endsWith('.js')) lang = 'javascript';
+		else if (f.path.endsWith('.sp')) lang = 'sporth';
+		const model = monaco.editor.createModel(f.content, lang, uri); // 'text/plain'
 		model.setEOL(monaco.editor.EndOfLineSequence.LF);
 		this.fileModels[f.id] = model;
 		model.onDidChangeContent(() => {
@@ -89,7 +97,25 @@ export class CodeEditor {
 			importScripts('${url}/vs/base/worker/workerMain.js');
 		`], { type: 'text/javascript' }));
 		require(["vs/editor/editor.main"], () => {
-			this.editor = monaco.editor.create(domEle, {automaticLayout: true});
+			this.editor = monaco.editor.create(domEle, {automaticLayout: true},{
+				storageService: {
+					get() {},
+					remove() { },
+					getBoolean(key) {
+						if (key === "expandSuggestionDocs")
+							return true;
+			
+						return false;
+					},
+					getNumber(key) {
+						return 0;
+					},
+					store() {},
+					onWillSaveState() {},
+					onDidChangeStorage() {}
+				}
+			});
+			registerSporth();
 			this.ready = true;
 			this.loadedSetProject();
 			this.shortcuts.forEach(s => this.loadedAddShortcut(...s));
