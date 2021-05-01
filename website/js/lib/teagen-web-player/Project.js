@@ -3,102 +3,150 @@
 
 const fileId = (() => {
 	let count = 100; // fail fast if array index is used instead of id
-	return () => ++count;
+	return () => 'id'+(++count);
 })();
 
 export class ProjFile {
-	constructor(path, content, isDir=false) {
+	constructor(name, content) {
 		/** @type {String} */
-		this.path = path;
+		this._name = name;
 		/** @type {String} */
 		this.content = content;
-		this.isDir = isDir;
+		/** @type {ProjDir} */
+		this._parent;
 		this.id = fileId();
 		this.renaming = false;
 		this.editing = false;
 	}
-	parentPath() {
-		if (!this.path.includes('/')) return;
-		return this.path.slice(0, path.lastIndexOf('/'));
+	get name() { return this._name; }
+	set name(v) {
+		this._name = v;
+		if (this.parent) this.parent.sortChildren();
 	}
-	numAncestors() {
-		return (this.path.match(/\//g) || []).length;
+	get parent() { return this._parent; }
+	get lineage() {
+		const lineage = [this];
+		let ancestor = this.parent;
+		while(ancestor?.parent) {
+			lineage.push(ancestor);
+			ancestor = ancestor.parent;
+		}
+		return lineage.reverse();
 	}
-	fileName() {
-		if (!this.path.includes('/')) return this.path;
-		return this.path.slice(this.path.lastIndexOf('/')+1);
+	get path() {
+		return this.lineage.map(f => f.name).join('/');
+	}
+	get numAncestors() {
+		return this.lineage.length - 1;
+	}
+	remove() {
+		if (!this.parent) throw new Error('Tried removing orphan '+this.name);
+		this.parent.removeChild(this);
+	}
+}
+
+export class ProjDir extends ProjFile {
+	constructor(name) {
+		super(name, '', true);
+		/** @type {Array.<ProjFile>} */
+		this._children = [];
+	}
+	/**
+	 * @param {ProjFile} file
+	 * @returns {ProjFile} - the added file
+	 */
+	addChild(file) {
+		if (file.parent) {
+			throw new Error(`Tried re-childing ${file.name} from ${file.parent.name} to ${this.name}!`);
+		}
+		file._parent = this;
+		this._children.push(file);
+		this.sortChildren();
+		return file;
+	}
+	/**
+	 * @param {ProjFile} file
+	 * @returns {ProjFile} - the removed file
+	 */
+	removeChild(file) {
+		if (!this._children.includes(file)) {
+			throw new Error(`Tried removing ${file.name} from wrong parent ${this.name}!`);
+		}
+		file._parent = undefined;
+		this._children = this._children.filter(child => child != file);
+		return file;
+	}
+	sortChildren() {
+		this._children.sort((a, b) => a.path.localeCompare(b.path));
+	}
+	/** @param {String} name */
+	findChild(name) {
+		return this._children.find(f => f.name === name);
+	}
+	get children() {
+		return this._children.values();
+	}
+	/** @returns {IterableIterator<ProjFile>} */
+	get descendants() {
+		const self = this;
+		return {*[Symbol.iterator]() {
+			/** @param {ProjFile} file */
+			function* visit(file) {
+				yield file;
+				if (!(file instanceof ProjDir)) return;
+				for (let child of file.children) {
+					yield* visit(child);
+				}
+			}
+			for (let child of self.children) {
+				yield* visit(child);
+			}
+		}};
 	}
 }
 
 export class Project {
 	constructor(name) {
-		/** @type {Array.<ProjFile>} */
-		this.files = [];
+		this.root = new ProjDir('root');
 		this.name = name;
 		this.renaming = false;
 	}
-	addFile(path, content) {
-		const f = new ProjFile(path, content);
-		this.files.push(f);
-		this.createMissingAncestors(path);
-		this.sortFiles();
+	/** @param {String} path */
+	addFileByPath(path, content) {
+		const components = path.split('/');
+		const name = components.pop();
+		const f = new ProjFile(name, content);
+		let parent = this.root;
+		for (let comp of components) {
+			if (parent.findChild(comp)) {
+				parent = parent.findChild(comp);
+			} else {
+				parent = parent.addChild(new ProjDir(comp));
+			}
+			if (!(parent instanceof ProjDir)) {
+				throw new Error(`Tried adding ${path}, but it clobbers non-directory ${parent.path}!`)
+			}
+		}
+		parent.addChild(f);
 		return f;
 	}
-	addDir(path) {
-		const f = new ProjFile(path, '', true);
-		this.files.push(f);
-		this.createMissingAncestors(path);
-		this.sortFiles();
+	findById(id) {
+		for (let file of this.root.descendants) {
+			if (file.id === id) return file;
+		}
+		throw new Error('Search for missing ID: '+id);
 	}
-	moveFile(id, newPath) {
-		if (this.getFileByPath(newPath)) return false;
-		const file = this.files.find(f => f.id === id);
-		const oldPath = file.path;
-		if (oldPath === newPath) return false;
-		file.path = newPath;
-		this.createMissingAncestors(newPath);
-		this.childrenOfPath(oldPath).forEach(child => {
-			this.moveFile(child.id, newPath + child.path.substring(oldPath.length));
-		});
-		this.sortFiles();
-		return true;
+	getStartingFile() {
+		let first;
+		for (let file of this.files) {
+			if (file instanceof ProjDir) continue;
+			if (!first) first = file;
+			if (file.name === 'main.js') return file;
+		}
+		return first;
 	}
-	/**
-	 * @param {ProjFile} file 
-	 * @returns {Array.<ProjFile>}
-	 */
-	childrenOfPath(parentPath) {
-		return this.files.filter(
-			f => f.path.startsWith(parentPath+'/')
-		);
-	}
-	sortFiles() {
-		this.files.sort((a, b) => a.path.localeCompare(b.path));
-	}
-	/** @param {String} path */
-	createMissingAncestors(path) {
-		if (!path.includes('/')) return;
-		const parent = path.slice(0, path.lastIndexOf('/'));
-		if (!this.getFileByPath(parent)) this.addDir(parent);
-	}
-	setContent(id, content) {
-		const file = this.files.find(f => f.id === id);
-		if (file.content === content) return false;
-		file.content = content;
-		return true;
-	}
-	delete(id) {
-		const idx = this.files.findIndex(f => f.id === id);
-		this.files.splice(idx, 1);
-	}
-	/** @return {Array.<ProjFile>} */
-	getFiles() {
-		return this.files;
-	}
-	getFileByPath(path) {
-		return this.files.find(f => f.path === path);
-	}
-	getContentByPath(path) {
-		return this.getFileByPath(path).content;
+	/** @returns {IterableIterator<ProjFile>} */
+	get files() {
+		return this.root.descendants;
 	}
 }

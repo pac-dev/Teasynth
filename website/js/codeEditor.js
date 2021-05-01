@@ -1,23 +1,37 @@
 import { loadScript } from "./network.js";
-import { Project, ProjFile } from './lib/teagen-web-player/Project.js';
+import { ProjDir, Project, ProjFile } from './lib/teagen-web-player/Project.js';
 import { registerSporth } from './sporthEditor.js';
 
 // always call model.setEOL immediately after model.setValue
 
+/** @param {ProjFile} f */
+const createModel = f => {
+	const uri = monaco.Uri.file('/'+f.path);
+	let lang;
+	if (f.path.endsWith('.js')) lang = 'javascript';
+	else if (f.path.endsWith('.sp')) lang = 'sporth';
+	const model = monaco.editor.createModel(f.content, lang, uri);
+	model.setEOL(monaco.editor.EndOfLineSequence.LF);
+	model.onDidChangeContent(() => {
+		f.content = model.getValue();
+	});
+	return model;
+}
+
 export class CodeEditor {
 	/** @param {Project} proj */
-	constructor(proj) {
+	constructor(proj, currentFileId) {
 		this.ready = false;
 		this.fileModels = {};
 		this.fileStates = {};
-		this.currentFileId = 0;
+		this.currentFileId = currentFileId;
 		this.shortcuts = [];
 		this.setProject(proj);
 	}
 	/** @param {Project} proj */
 	setProject(proj) {
 		this.proj = proj;
-		if (this.ready) this.loadedSetProject();
+		if (this.ready) this.updateFiles();
 	}
 	/**
 	 * refer to https://microsoft.github.io/monaco-editor/api/enums/monaco.keycode.html
@@ -27,11 +41,41 @@ export class CodeEditor {
 		this.shortcuts.push([shortcut, label, run]);
 		if (this.ready) this.loadedAddShortcut(shortcut, label, run);
 	}
-	loadedSetProject() {
-		Object.keys(this.fileModels).forEach(k => this.removeFile(k));
-		const files = this.proj.getFiles();
-		files.forEach(f => this.addFile(f));
-		this.switchToFile(files[0].id);
+	updateFiles() {
+		const projFiles = [...this.proj.files].filter(f => !(f instanceof ProjDir));
+		const projIds = projFiles.map(f => f.id);
+		for (let file of projFiles) {
+			const oldModel = this.fileModels[file.id];
+			if (oldModel) {
+				if (oldModel.getValue() !== file.content) {
+					oldModel.setValue(file.content);
+				}
+				if (oldModel.uri.path !== '/'+file.path) {
+					console.log(`monaco: path change: ${oldModel.uri.path} -> /${file.path}`);
+					this.fileModels[file.id].dispose();
+					this.fileModels[file.id] = createModel(file);
+				}
+			} else {
+				this.fileModels[file.id] = createModel(file);
+			}
+		}
+		for (const id of Object.keys(this.fileModels)) {
+			if (!projIds.includes(id)) {
+				this.fileModels[id].dispose();
+				delete this.fileModels[id];
+				delete this.fileStates[id];
+			}
+		}
+		if (!this.editor.getModel() || this.editor.getModel() !== this.fileModels[this.currentFileId]) {
+			if (this.fileModels[this.currentFileId]) {
+				console.log('monaco: current model recreated, switching to new model');
+				const id = this.currentFileId;
+				this.currentFileId = 0;
+				this.switchToFile(id);
+			} else {
+				console.log('monaco: file for current model disappeared');
+			}
+		}
 	}
 	loadedAddShortcut(shortcut, label, run) {
 		let key;
@@ -45,21 +89,8 @@ export class CodeEditor {
 		this.editor.addAction({
 			id: label.replaceAll(' ', '-'),
 			label, keybindings: [key],
-			// @param editor The editor instance is passed in as a convinience
+			// @param editor The editor instance is passed in as a convenience
 			run
-		});
-	}
-	/** @param {ProjFile} f */
-	addFile(f) {
-		const uri = monaco.Uri.file('/'+f.path);
-		let lang;
-		if (f.path.endsWith('.js')) lang = 'javascript';
-		else if (f.path.endsWith('.sp')) lang = 'sporth';
-		const model = monaco.editor.createModel(f.content, lang, uri); // 'text/plain'
-		model.setEOL(monaco.editor.EndOfLineSequence.LF);
-		this.fileModels[f.id] = model;
-		model.onDidChangeContent(() => {
-			this.proj.setContent(f.id, model.getValue());
 		});
 	}
 	switchToFile(id) {
@@ -67,23 +98,11 @@ export class CodeEditor {
 		if (this.currentFileId)
 			this.fileStates[this.currentFileId] = this.editor.saveViewState();
 		this.editor.setModel(this.fileModels[id]);
-		if (this.fileStates[id])
+		if (this.fileStates[id]) {
+			// should work even if the model has been recreated
 			this.editor.restoreViewState(this.fileStates[id]);
+		}
 		this.currentFileId = id;
-	}
-	/** @param {ProjFile} f */
-	updateFileName(f) {
-		// https://github.com/Microsoft/monaco-editor/issues/926
-		const isCurrentFile = this.currentFileId === f.id;
-		if (isCurrentFile) this.currentFileId = 0;
-		this.removeFile(f.id);
-		this.addFile(f);
-		if (isCurrentFile) this.switchToFile(f.id);
-	}
-	removeFile(id) {
-		if (this.fileModels[id])
-			this.fileModels[id].dispose();
-		delete this.fileModels[id];
 	}
 	focus() { this.editor.focus(); }
 	async load(url, domEle) {
@@ -117,7 +136,7 @@ export class CodeEditor {
 			});
 			registerSporth();
 			this.ready = true;
-			this.loadedSetProject();
+			this.updateFiles();
 			this.shortcuts.forEach(s => this.loadedAddShortcut(...s));
 		});
 	}

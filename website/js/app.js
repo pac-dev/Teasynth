@@ -1,30 +1,37 @@
 import { CodeEditor } from './codeEditor.js';
 import { m } from './lib/mithrilModule.js';
-import { Project, ProjFile } from './lib/teagen-web-player/Project.js';
+import { ProjDir, Project, ProjFile } from './lib/teagen-web-player/Project.js';
 import { proj2zip, zip2proj, play, stop, initService } from './lib/teagen-web-player/player.js';
 
 let proj = new Project('Untitled Project');
-proj.addFile('main.js', "console.log('running in bread')");
-proj.addFile('worklet.js', '// hello');
-let editingId = proj.getFiles()[0].id;
-const editor = new CodeEditor(proj);
+// proj.addFileByPath('main.js', "console.log('running in bread')");
+// proj.addFileByPath('test/nah.js', '// hello');
+// proj.addFileByPath('test/yah.js', '// hyello');
+proj.root.addChild(new ProjFile('main.js', "console.log('running in bread')"));
+proj.root.addChild(new ProjFile('main2.js', "consol22e.log('running in bread')"));
+proj.root.addChild(new ProjFile('main3.js', "consol33e.log('running in bread')"));
+const el = proj.root.addChild(new ProjDir('eldirado'));
+el.addChild(new ProjFile('mdain3.js', "consol3d3e.log('running in bread')"));
+el.addChild(new ProjFile('mdaiggn3.js', "consol3ggin bread')"));
+let editingFile = proj.getStartingFile();
+const editor = new CodeEditor(proj, editingFile.id);
 window.theEditor = editor;
 editor.addShortcut('Alt+KEY_1', 'Play', () => play(proj));
 editor.addShortcut('Alt+KEY_2', 'Stop', () => stop());
 editor.addShortcut('Alt+KEY_3', 'Previous File', () => {
-	const files = proj.getFiles();
+	const files = [...proj.files].filter(f => !(f instanceof ProjDir));
 	if (files.length < 2) return;
-	let currentIdx = files.findIndex(f => f.id == editingId);
+	let currentIdx = files.findIndex(f => f == editingFile);
 	if (currentIdx === undefined) return;
-	editingId = files[(files.length+currentIdx-1)%files.length].id;
+	editingFile = files[(files.length+currentIdx-1)%files.length];
 	m.redraw();
 });
 editor.addShortcut('Alt+KEY_4', 'Next File', () => {
-	const files = proj.getFiles();
+	const files = [...proj.files].filter(f => !(f instanceof ProjDir));
 	if (files.length < 2) return;
-	let currentIdx = files.findIndex(f => f.id == editingId);
+	let currentIdx = files.findIndex(f => f == editingFile);
 	if (currentIdx === undefined) return;
-	editingId = files[(currentIdx+1)%files.length].id;
+	editingFile = files[(currentIdx+1)%files.length];
 	m.redraw();
 });
 
@@ -51,11 +58,11 @@ const makeRenamer = ({obj, getValue, setValue}) => {
 		},
 		onkeyup: e => {
 			if (e.keyCode === 13) { // enter
-				e.target.blur();
+				e.target.blur(); // in case there's no editor
 				editor.focus();
 			} else if (e.keyCode === 27) { // esc
 				e.target.value = getValue();
-				e.target.blur();
+				e.target.blur(); // in case there's no editor
 				editor.focus();
 			}
 		}
@@ -66,34 +73,34 @@ const makeRenamer = ({obj, getValue, setValue}) => {
 const makeFileItem = f => m(
 	'.file_item', {
 		key: f.id, 
-		class: (f.id === editingId ? 'editing ' : ''),
-		style: { gridTemplateColumns: `repeat(${f.numAncestors()}, 1rem) 1fr` }
+		class: (f === editingFile ? 'editing ' : ''),
+		style: { gridTemplateColumns: `repeat(${f.numAncestors}, 1rem) 1fr` }
 	}, [
-		...[...Array(f.numAncestors())].map(_ => m('.parent_bar')),
+		...[...Array(f.numAncestors)].map(_ => m('.parent_bar')),
 		m('.path', {
 			onclick: () => {
-				editingId = f.id;
+				editingFile = f;
 				editor.focus();
 			},
 			ondblclick: () => {
 				f.renaming = true;
 			}
-		}, (f.path ? f.fileName() : m.trust('&nbsp;'))),
+		}, (f.name ? f.name : m.trust('&nbsp;'))),
 		m('.delete', {
 			onclick: () => {
-				proj.delete(f.id);
-				editor.removeFile(f.id);
+				f.remove();
+				editor.updateFiles();
+				editor.focus();
 			}
 		}),
 		makeRenamer({
-			getValue: () => f.path,
+			getValue: () => f.name,
 			setValue: v => {
-				if (proj.moveFile(f.id, v))
-					window.setTimeout(() => {
-						editor.updateFileName(f);
-						editor.focus();
-					}, 100);
-				editor.focus();
+				f.name = v;
+				window.setTimeout(() => {
+					editor.updateFiles();
+					editor.focus();
+				}, 50);
 			},
 			obj: f
 		})
@@ -102,13 +109,14 @@ const makeFileItem = f => m(
 
 const FileList = {
 	view: () => [
-		proj.getFiles().map(makeFileItem),
+		[...proj.files].map(makeFileItem),
 		m('.add', {
 			onclick: () => {
-				const newFile = proj.addFile('', '');
-				editor.addFile(newFile);
-				editingId = newFile.id;
+				const newFile = new ProjFile('', '');
+				proj.root.addChild(newFile);
+				editingFile = newFile;
 				newFile.renaming = true;
+				editor.updateFiles();
 			}
 		})
 	]
@@ -117,7 +125,7 @@ const FileList = {
 const CodeContainer = {
 	view: () => m('.code'),
 	oncreate: vnode => editor.load(monacoURL, vnode.dom),
-	onupdate: () => editor.switchToFile(editingId)
+	onupdate: () => editor.switchToFile(editingFile.id)
 };
 
 const TopLinks = {
@@ -146,6 +154,7 @@ const TopLinks = {
 				a.href = fileURL;
 				a.download = proj.name + '.zip';
 				a.click();
+				editor.focus();
 			}
 		}, 'save'),
 		m('input', {
@@ -156,9 +165,10 @@ const TopLinks = {
 				if (!file) return;
 				proj = await zip2proj(file);
 				editor.setProject(proj);
-				editingId = proj.getFiles()[0].id;
+				editingFile = proj.getStartingFile();
 				e.target.value = null;
 				m.redraw();
+				editor.focus();
 			}
 		})
 	]
@@ -167,10 +177,16 @@ const TopLinks = {
 const Tools = {
 	view: () => [
 		m('.tool', {
-			onclick: () => play(proj)
+			onclick: () => {
+				play(proj);
+				editor.focus();
+			}
 		}, 'play'),
 		m('.tool', {
-			onclick: () => stop()
+			onclick: () => {
+				stop();
+				editor.focus();
+			}
 		}, 'stop')
 	]
 };
