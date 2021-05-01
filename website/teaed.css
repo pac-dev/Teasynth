@@ -88,11 +88,14 @@ input[type="file"] {
 /** project files **/
 
 .file_item {
-	display: block;
+	display: grid;
 	position: relative;
 }
 .file_item.editing {
 	background-color: #fff;
+}
+.file_item > .parent_bar {
+	border-right: 0.1rem solid;
 }
 .file_item > .path {
 	padding: 0.3rem 0.6rem;

@@ -15,9 +15,12 @@ export const zip2proj = async file => {
 	const entries = [];
 	zip.forEach((path, obj) => entries.push({path, obj}));
 	for (let {path, obj} of entries) {
-		if (obj.dir) continue;
-		const content = await obj.async('string');
-		proj.addFile(path, content);
+		if (obj.dir) {
+			proj.addDir(path);
+		} else {
+			const content = await obj.async('string');
+			proj.addFile(path, content);
+		}
 	}
 	return proj;
 };

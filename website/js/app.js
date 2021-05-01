@@ -1,6 +1,6 @@
 import { CodeEditor } from './codeEditor.js';
 import { m } from './lib/mithrilModule.js';
-import { Project } from './lib/teagen-web-player/Project.js';
+import { Project, ProjFile } from './lib/teagen-web-player/Project.js';
 import { proj2zip, zip2proj, play, stop, initService } from './lib/teagen-web-player/player.js';
 
 let proj = new Project('Untitled Project');
@@ -8,6 +8,7 @@ proj.addFile('main.js', "console.log('running in bread')");
 proj.addFile('worklet.js', '// hello');
 let editingId = proj.getFiles()[0].id;
 const editor = new CodeEditor(proj);
+window.theEditor = editor;
 editor.addShortcut('Alt+KEY_1', 'Play', () => play(proj));
 editor.addShortcut('Alt+KEY_2', 'Stop', () => stop());
 editor.addShortcut('Alt+KEY_3', 'Previous File', () => {
@@ -50,18 +51,25 @@ const makeRenamer = ({obj, getValue, setValue}) => {
 		},
 		onkeyup: e => {
 			if (e.keyCode === 13) { // enter
+				e.target.blur();
 				editor.focus();
 			} else if (e.keyCode === 27) { // esc
 				e.target.value = getValue();
+				e.target.blur();
 				editor.focus();
 			}
 		}
 	});
 };
 
+/** @param {ProjFile} f */
 const makeFileItem = f => m(
-	'.file_item', {key: f.id, class: (f.id === editingId ? 'editing ' : '')}, 
-	[
+	'.file_item', {
+		key: f.id, 
+		class: (f.id === editingId ? 'editing ' : ''),
+		style: { gridTemplateColumns: `repeat(${f.numAncestors()}, 1rem) 1fr` }
+	}, [
+		...[...Array(f.numAncestors())].map(_ => m('.parent_bar')),
 		m('.path', {
 			onclick: () => {
 				editingId = f.id;
@@ -70,7 +78,7 @@ const makeFileItem = f => m(
 			ondblclick: () => {
 				f.renaming = true;
 			}
-		}, (f.path ? f.path : m.trust('&nbsp;'))),
+		}, (f.path ? f.fileName() : m.trust('&nbsp;'))),
 		m('.delete', {
 			onclick: () => {
 				proj.delete(f.id);
