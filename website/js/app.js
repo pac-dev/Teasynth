@@ -4,18 +4,22 @@ import { ProjDir, Project, ProjFile } from './lib/teagen-web-player/Project.js';
 import { proj2zip, zip2proj, play, stop, initService } from './lib/teagen-web-player/player.js';
 
 let proj = new Project('Untitled Project');
+window.tgProj = proj;
 // proj.addFileByPath('main.js', "console.log('running in bread')");
 // proj.addFileByPath('test/nah.js', '// hello');
 // proj.addFileByPath('test/yah.js', '// hyello');
-proj.root.addChild(new ProjFile('main.js', "console.log('running in bread')"));
-proj.root.addChild(new ProjFile('main2.js', "consol22e.log('running in bread')"));
-proj.root.addChild(new ProjFile('main3.js', "consol33e.log('running in bread')"));
-const el = proj.root.addChild(new ProjDir('eldirado'));
-el.addChild(new ProjFile('mdain3.js', "consol3d3e.log('running in bread')"));
-el.addChild(new ProjFile('mdaiggn3.js', "consol3ggin bread')"));
+proj.root.addChild(new ProjFile('fa.js', "a console.log('running in bread')"));
+proj.root.addChild(new ProjFile('fb.js', "b consol22e.log('running in bread')"));
+proj.root.addChild(new ProjFile('fc.js', "c consol33e.log('running in bread')"));
+const el = proj.root.addChild(new ProjDir('da'));
+el.addChild(new ProjFile('dafa.js', "consol3d3e.log('running in bread')"));
+el.addChild(new ProjFile('dafb.js', "consol3ggin bread')"));
+const el2 = el.addChild(new ProjDir('za'));
+el2.addChild(new ProjFile('zafa.js', "consol3d3e.log('running in bread')"));
+el2.addChild(new ProjFile('zafb.js', "consol3ggin bread')"));
 let editingFile = proj.getStartingFile();
 const editor = new CodeEditor(proj, editingFile.id);
-window.theEditor = editor;
+window.tgEditor = editor;
 editor.addShortcut('Alt+KEY_1', 'Play', () => play(proj));
 editor.addShortcut('Alt+KEY_2', 'Stop', () => stop());
 editor.addShortcut('Alt+KEY_3', 'Previous File', () => {
@@ -40,13 +44,26 @@ const urlBase = url.substring(0, url.lastIndexOf('/')+1);
 const monacoURL = urlBase+'js/lib/monaco/min';
 initService(urlBase); // async
 
+/** @param {ProjDir} dir */
+const newFileInDir = dir => {
+	const newFile = new ProjFile('new', '');
+	dir.addChild(newFile);
+	if (dir.collapsed) dir.collapsed = false;
+	editingFile = newFile;
+	newFile.renaming = true;
+	editor.updateFiles();
+};
+
 const makeRenamer = ({obj, getValue, setValue}) => {
 	const renameHandler = input => {
 		if (!obj.renaming || document.activeElement === input)
 			return;
 		input.value = getValue();
 		input.focus();
-		input.setSelectionRange(0, input.value.lastIndexOf('.'));
+		input.setSelectionRange(
+			input.value.lastIndexOf('/') + 1,
+			input.value.lastIndexOf('.')
+		);
 	};
 	return m('input.renamer', {
 		class: (obj.renaming ? 'renaming' : ''),
@@ -70,33 +87,56 @@ const makeRenamer = ({obj, getValue, setValue}) => {
 };
 
 /** @param {ProjFile} f */
+const decorators = f => {
+	const ret = [...Array(f.numAncestors)].map(_ => m('.parent_bar'));
+	if (!(f instanceof ProjDir)) return ret;
+	ret.push(m(
+		f.collapsed ? '.collapser.closed' : '.collapser.open',
+		{onclick: () => {
+			f.collapsed = !f.collapsed;
+		}}
+	));
+	return ret;
+};
+
+/** @param {ProjFile} f */
+const fileButtons = f => {
+	const ret = [m('.filebtn.delete', {
+		onclick: () => {
+			f.remove();
+			editor.updateFiles();
+			editor.focus();
+		}
+	})];
+	if (!(f instanceof ProjDir)) return ret;
+	ret.push(m('.filebtn.add', {
+		onclick: () => newFileInDir(f)
+	}));
+	return ret;
+};
+
+/** @param {ProjFile} f */
 const makeFileItem = f => m(
 	'.file_item', {
 		key: f.id, 
 		class: (f === editingFile ? 'editing ' : ''),
-		style: { gridTemplateColumns: `repeat(${f.numAncestors}, 1rem) 1fr` }
+		style: { gridTemplateColumns: `repeat(${decorators(f).length}, 1rem) 1fr` }
 	}, [
-		...[...Array(f.numAncestors)].map(_ => m('.parent_bar')),
+		...decorators(f),
 		m('.path', {
 			onclick: () => {
-				editingFile = f;
+				if (!(f instanceof ProjDir)) editingFile = f;
 				editor.focus();
 			},
 			ondblclick: () => {
 				f.renaming = true;
 			}
-		}, (f.name ? f.name : m.trust('&nbsp;'))),
-		m('.delete', {
-			onclick: () => {
-				f.remove();
-				editor.updateFiles();
-				editor.focus();
-			}
-		}),
+		}, f.name ?? m.trust('&nbsp;')),
+		...fileButtons(f),
 		makeRenamer({
-			getValue: () => f.name,
+			getValue: () => f.path,
 			setValue: v => {
-				f.name = v;
+				proj.changeFilePath(f, v);
 				window.setTimeout(() => {
 					editor.updateFiles();
 					editor.focus();
@@ -109,15 +149,9 @@ const makeFileItem = f => m(
 
 const FileList = {
 	view: () => [
-		[...proj.files].map(makeFileItem),
-		m('.add', {
-			onclick: () => {
-				const newFile = new ProjFile('', '');
-				proj.root.addChild(newFile);
-				editingFile = newFile;
-				newFile.renaming = true;
-				editor.updateFiles();
-			}
+		[...proj.files].filter(f => !f.hasCollapsedAncestor).map(makeFileItem),
+		m('.filebtn.add', {
+			onclick: () => newFileInDir(proj.root)
 		})
 	]
 };

@@ -97,42 +97,68 @@ input[type="file"] {
 .file_item > .parent_bar {
 	border-right: 0.1rem solid;
 }
+.file_item > .collapser {
+	position: relative;
+}
+.file_item > .collapser:after {
+	position: absolute;
+	top: 48%;
+	left: 96%;
+	transform: translate(-50%, -50%);
+}
+.file_item > .collapser.open:after {
+	content: '-';
+}
+.file_item > .collapser.closed:after {
+	content: '+';
+}
 .file_item > .path {
-	padding: 0.3rem 0.6rem;
+	padding: 0.3rem 0.6rem 0.3rem 1rem;
 	touch-action: none;
 	user-select: none;
 }
-.file_item > .delete {
-	position: absolute;
+.filebtn {
 	display: none;
+	font-size: 1.8rem;
+	font-weight: 800;
+	cursor: pointer;
+	text-align: center;
+}
+.file_item > .filebtn.add {
+	position: absolute;
+	right: 2.5rem;
+	top: 0;
+	bottom: 0;
+	width: 2.5rem;
+	color: #7d7;
+}
+.file_item > .filebtn.add:after {
+	content: '+';
+}
+.file_item:hover > .filebtn.add {
+	display: block;
+}
+.file_item > .filebtn.delete {
+	position: absolute;
 	right: 0;
 	top: 0;
 	bottom: 0;
 	width: 2.5rem;
-	text-align: center;
 	color: #d77;
-	font-size: 1.8rem;
-	font-weight: 800;
-	cursor: pointer;
 }
-.file_item > .delete:after {
+.file_item > .filebtn.delete:after {
 	content: '×';
 }
-.file_item:hover > .delete {
+.file_item:hover > .filebtn.delete {
 	display: block;
 }
-.project_files > .add {
-	display: none;
-	text-align: center;
+.project_files > .filebtn.add {
 	color: #7d7;
-	font-size: 1.8rem;
-	font-weight: 800;
-	cursor: pointer;
 }
-.project_files > .add:after {
+.project_files > .filebtn.add:after {
 	content: '+';
 }
-.project_files:hover > .add {
+.project_files:hover > .filebtn.add {
 	display: block;
 }
 

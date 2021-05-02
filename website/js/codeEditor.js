@@ -51,7 +51,7 @@ export class CodeEditor {
 					oldModel.setValue(file.content);
 				}
 				if (oldModel.uri.path !== '/'+file.path) {
-					console.log(`monaco: path change: ${oldModel.uri.path} -> /${file.path}`);
+					//console.log(`monaco: path change: ${oldModel.uri.path} -> /${file.path}`);
 					this.fileModels[file.id].dispose();
 					this.fileModels[file.id] = createModel(file);
 				}
@@ -68,12 +68,12 @@ export class CodeEditor {
 		}
 		if (!this.editor.getModel() || this.editor.getModel() !== this.fileModels[this.currentFileId]) {
 			if (this.fileModels[this.currentFileId]) {
-				console.log('monaco: current model recreated, switching to new model');
+				//console.log('monaco: current model recreated, switching to new model');
 				const id = this.currentFileId;
 				this.currentFileId = 0;
 				this.switchToFile(id);
 			} else {
-				console.log('monaco: file for current model disappeared');
+				//console.log('monaco: file for current model disappeared');
 			}
 		}
 	}

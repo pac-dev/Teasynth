@@ -25,7 +25,7 @@ export class ProjFile {
 	}
 	get parent() { return this._parent; }
 	get lineage() {
-		const lineage = [this];
+		const lineage = [];
 		let ancestor = this.parent;
 		while(ancestor?.parent) {
 			lineage.push(ancestor);
@@ -34,10 +34,13 @@ export class ProjFile {
 		return lineage.reverse();
 	}
 	get path() {
-		return this.lineage.map(f => f.name).join('/');
+		return [...this.lineage, this].map(f => f.name).join('/');
 	}
 	get numAncestors() {
-		return this.lineage.length - 1;
+		return this.lineage.length;
+	}
+	get hasCollapsedAncestor() {
+		return this.lineage.some(f => f.collapsed);
 	}
 	remove() {
 		if (!this.parent) throw new Error('Tried removing orphan '+this.name);
@@ -50,6 +53,7 @@ export class ProjDir extends ProjFile {
 		super(name, '', true);
 		/** @type {Array.<ProjFile>} */
 		this._children = [];
+		this.collapsed = false;
 	}
 	/**
 	 * @param {ProjFile} file
@@ -58,6 +62,9 @@ export class ProjDir extends ProjFile {
 	addChild(file) {
 		if (file.parent) {
 			throw new Error(`Tried re-childing ${file.name} from ${file.parent.name} to ${this.name}!`);
+		}
+		if (this._children.some(c => c.name === file.name)) {
+			throw new Error(`File ${file.name} already exist!`);
 		}
 		file._parent = this;
 		this._children.push(file);
@@ -111,11 +118,13 @@ export class Project {
 		this.name = name;
 		this.renaming = false;
 	}
-	/** @param {String} path */
-	addFileByPath(path, content) {
+	/**
+	 * @param {ProjFile} file
+	 * @param {String} path
+	 */
+	changeFilePath(file, path) {
 		const components = path.split('/');
-		const name = components.pop();
-		const f = new ProjFile(name, content);
+		file.name = components.pop();
 		let parent = this.root;
 		for (let comp of components) {
 			if (parent.findChild(comp)) {
@@ -127,8 +136,9 @@ export class Project {
 				throw new Error(`Tried adding ${path}, but it clobbers non-directory ${parent.path}!`)
 			}
 		}
-		parent.addChild(f);
-		return f;
+		file.remove();
+		parent.addChild(file);
+		return file;
 	}
 	findById(id) {
 		for (let file of this.root.descendants) {
