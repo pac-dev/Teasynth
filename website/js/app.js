@@ -1,7 +1,8 @@
 import { CodeEditor } from './codeEditor.js';
 import { m } from './lib/mithrilModule.js';
-import { ProjDir, Project, ProjFile } from './lib/teagen-web-player/Project.js';
-import { proj2zip, zip2proj, play, stop, initService } from './lib/teagen-web-player/player.js';
+import { ProjDir, Project, ProjFile } from './Project.js';
+import { initService, play, stop } from './player.js';
+import { fsOpen, fsSave, fsSaveAs, canSave } from './fsa.js';
 
 let proj = new Project('Untitled Project');
 window.tgProj = proj;
@@ -178,33 +179,26 @@ const TopLinks = {
 			})
 		]),
 		m('.toplink', {
-			onclick: () => document.getElementById('load_input').click()
-		}, 'load'),
-		m('.toplink', {
 			onclick: async () => {
-				const blob = await proj2zip(proj);
-				const fileURL = URL.createObjectURL(blob);
-				const a = document.createElement('A');
-				a.href = fileURL;
-				a.download = proj.name + '.zip';
-				a.click();
-				editor.focus();
-			}
-		}, 'save'),
-		m('input', {
-			type: 'file',
-			id: 'load_input',
-			onchange: async e => {
-				const file = e.target.files[0];
-				if (!file) return;
-				proj = await zip2proj(file);
+				proj = await fsOpen();
 				editor.setProject(proj);
 				editingFile = proj.getStartingFile();
-				e.target.value = null;
 				m.redraw();
 				editor.focus();
 			}
-		})
+		}, 'load'),
+		m(canSave() ? '.toplink' : '.toplink.disabled', {
+			onclick: async () => {
+				await fsSave(proj);
+				editor.focus();
+			}
+		}, 'save'),
+		m('.toplink', {
+			onclick: async () => {
+				await fsSaveAs(proj);
+				editor.focus();
+			}
+		}, 'as')
 	]
 };
 

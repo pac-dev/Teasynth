@@ -29,7 +29,7 @@ body {
 }
 .project_head {
 	display: grid;
-	grid-template-columns: 1fr 1fr;
+	grid-template-columns: repeat(3, 1fr);
 }
 .project_files {
 	display: block;
@@ -73,15 +73,17 @@ input.renamer.renaming {
 	touch-action: none;
 	user-select: none;
 }
+
+.toplink.disabled {
+	color: #888;
+	pointer-events: none;
+}
 .toplink:hover {
 	background: #fff3;
 }
 .proj_name {
 	grid-column-start: 1;
-	grid-column-end: 3;
-}
-input[type="file"] {
-	display: none;
+	grid-column-end: 4;
 }
 
 

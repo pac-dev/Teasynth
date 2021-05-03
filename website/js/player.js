@@ -1,29 +1,4 @@
-import { JSZip } from './lib/jszipModule.js';
 import { Project } from './Project.js';
-
-/** @param {Project} proj */
-export const proj2zip = async proj => {
-	const zip = new JSZip();
-	proj.getFiles().forEach(f => zip.file(f.path, f.content))
-	return await zip.generateAsync({type:'blob'});
-};
-
-/** @param {File} file */
-export const zip2proj = async file => {
-	const zip = await JSZip.loadAsync(file);
-	const proj = new Project(file.name.substr(0, file.name.lastIndexOf('.')));
-	const entries = [];
-	zip.forEach((path, obj) => entries.push({path, obj}));
-	for (let {path, obj} of entries) {
-		if (obj.dir) {
-			proj.addDir(path);
-		} else {
-			const content = await obj.async('string');
-			proj.addFile(path, content);
-		}
-	}
-	return proj;
-};
 
 /** @type {ServiceWorker} */
 let service;
@@ -86,13 +61,14 @@ export const play = async proj => {
 	await stop();
 	buildId = Math.random().toString(36).substring(7);
 	console.log('new build id: '+buildId);
-	const files = Object.fromEntries(proj.getFiles().map(f => [
+	const files = Object.fromEntries([...proj.files].map(f => [
 		buildId+'/'+f.path, f.content
 	]));
 	let metaFile = `
 	const fileContents = {};
 	export const getFileText = path => fileContents[path];`;
-	for (let file of proj.getFiles()) {
+	for (let file of proj.files) {
+		if (file.content.length > 100000) continue;
 		metaFile += `
 		fileContents[${JSON.stringify(file.path)}] = ${JSON.stringify(file.content)};
 		`;

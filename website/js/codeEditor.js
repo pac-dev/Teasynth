@@ -1,5 +1,5 @@
 import { loadScript } from "./network.js";
-import { ProjDir, Project, ProjFile } from './lib/teagen-web-player/Project.js';
+import { ProjDir, Project, ProjFile } from './Project.js';
 import { registerSporth } from './sporthEditor.js';
 
 // always call model.setEOL immediately after model.setValue
