@@ -1,4 +1,4 @@
-import { Project } from './Project.js';
+import { Project, ProjFile } from './Project.js';
 
 /** @type {ServiceWorker} */
 let service;
@@ -55,8 +55,12 @@ export const stop = async () => {
 	buildId = undefined;
 };
 
-/** @param {Project} proj */
-export const play = async proj => {
+/**
+ * @param {Project} proj
+ * @param {ProjFile} main
+ */
+export const play = async (proj, main) => {
+	console.log('playing '+main.path);
 	if (!service) throw new Error('Service worker not ready.');
 	await stop();
 	buildId = Math.random().toString(36).substring(7);
@@ -64,18 +68,23 @@ export const play = async proj => {
 	const files = Object.fromEntries([...proj.files].map(f => [
 		buildId+'/'+f.path, f.content
 	]));
+	const mainDir = main.parent.path;
+	const trackRelativeKey = file => JSON.stringify(
+		file.path.substring(mainDir.length+1)
+	);
 	let metaFile = `
 	const fileContents = {};
-	export const getFileText = path => fileContents[path];`;
-	for (let file of proj.files) {
+	export const getFile = path => fileContents[path];`;
+	for (let file of main.parent.descendants) {
 		if (file.content.length > 100000) continue;
 		metaFile += `
-		fileContents[${JSON.stringify(file.path)}] = ${JSON.stringify(file.content)};
+		fileContents[${trackRelativeKey(file)}] = ${JSON.stringify(file.content)};
 		`;
 	}
-	files[buildId+'/platform/files.js'] = metaFile;
+	files[`${buildId}/${mainDir}/generated/project.js`] = metaFile;
+	const mainUrl = `${urlBase}${buildId}/${main.path}`;
 	await serviceCommand({ type: 'addBuild', buildId, files});
-	const preRun = await import(`${urlBase}${buildId}/main.js`);
+	const preRun = await import(mainUrl);
 	const sampleRate = preRun.sampleRate ?? 44100;
 	if (!preRun.process) throw new Error('main.js must export a "process" function!');
 	let preOut = await preRun.process();
@@ -115,7 +124,7 @@ export const play = async proj => {
 	}
 	const processorName = 'MainProcessor' + processorId();
 	const shim = `
-	import { process } from '${urlBase}${buildId}/main.js';
+	import { process } from '${mainUrl}';
 	class MainProcessor extends AudioWorkletProcessor {
 		constructor(options) {
 			super(options);

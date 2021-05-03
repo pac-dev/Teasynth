@@ -42,6 +42,12 @@ export class ProjFile {
 	get hasCollapsedAncestor() {
 		return this.lineage.some(f => f.collapsed);
 	}
+	get closestMain() {
+		for (let searchDir of this.lineage.reverse()) {
+			const ret = searchDir.findChild('main.js');
+			if (ret) return ret;
+		}
+	}
 	remove() {
 		if (!this.parent) throw new Error('Tried removing orphan '+this.name);
 		this.parent.removeChild(this);
@@ -141,12 +147,12 @@ export class Project {
 		return file;
 	}
 	findById(id) {
-		for (let file of this.root.descendants) {
+		for (let file of this.files) {
 			if (file.id === id) return file;
 		}
 		throw new Error('Search for missing ID: '+id);
 	}
-	getStartingFile() {
+	getDefaultMain() {
 		let first;
 		for (let file of this.files) {
 			if (file instanceof ProjDir) continue;
@@ -158,5 +164,12 @@ export class Project {
 	/** @returns {IterableIterator<ProjFile>} */
 	get files() {
 		return this.root.descendants;
+	}
+	/** @param {ProjFile} file */
+	includes(file) {
+		for (let f of this.files) {
+			if (f === file) return true;
+		}
+		return false;
 	}
 }

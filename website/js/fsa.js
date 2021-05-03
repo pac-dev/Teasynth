@@ -32,7 +32,8 @@ const deleteEntry = (fsDir, entry) => {
 };
 
 export const fsSave = async proj => {
-	if (!currentDirHandle) return;
+	if (!currentDirHandle) throw new Error('Nowhere to save!');
+	console.log('Saving...')
 	if ((await currentDirHandle.queryPermission({mode: 'readwrite'})) !== 'granted') {
 		if ((await currentDirHandle.requestPermission({mode: 'readwrite'})) !== 'granted') {
 			throw new Error("Couldn't get permission to write to "+currentDirHandle.name);

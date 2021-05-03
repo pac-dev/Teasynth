@@ -5,23 +5,20 @@ import { initService, play, stop } from './player.js';
 import { fsOpen, fsSave, fsSaveAs, canSave } from './fsa.js';
 
 let proj = new Project('Untitled Project');
-window.tgProj = proj;
-// proj.addFileByPath('main.js', "console.log('running in bread')");
-// proj.addFileByPath('test/nah.js', '// hello');
-// proj.addFileByPath('test/yah.js', '// hyello');
-proj.root.addChild(new ProjFile('fa.js', "a console.log('running in bread')"));
-proj.root.addChild(new ProjFile('fb.js', "b consol22e.log('running in bread')"));
-proj.root.addChild(new ProjFile('fc.js', "c consol33e.log('running in bread')"));
-const el = proj.root.addChild(new ProjDir('da'));
-el.addChild(new ProjFile('dafa.js', "consol3d3e.log('running in bread')"));
-el.addChild(new ProjFile('dafb.js', "consol3ggin bread')"));
-const el2 = el.addChild(new ProjDir('za'));
-el2.addChild(new ProjFile('zafa.js', "consol3d3e.log('running in bread')"));
-el2.addChild(new ProjFile('zafb.js', "consol3ggin bread')"));
-let editingFile = proj.getStartingFile();
+proj.root.addChild(new ProjFile('main.js', "console.log('running in bread')"));
+let editingFile = proj.getDefaultMain();
+let lastMain = editingFile;
+const playProj = () => {
+	let main = editingFile.closestMain;
+	if (!main) main = lastMain;
+	if (!proj.includes(main)) throw new Error('No main file to play.');
+	lastMain = main;
+	play(proj, main);
+};
 const editor = new CodeEditor(proj, editingFile.id);
-window.tgEditor = editor;
-editor.addShortcut('Alt+KEY_1', 'Play', () => play(proj));
+window.getProj = () => proj;
+window.getEditor = () => editor;
+editor.addShortcut('Alt+KEY_1', 'Play', () => playProj());
 editor.addShortcut('Alt+KEY_2', 'Stop', () => stop());
 editor.addShortcut('Alt+KEY_3', 'Previous File', () => {
 	const files = [...proj.files].filter(f => !(f instanceof ProjDir));
@@ -182,7 +179,7 @@ const TopLinks = {
 			onclick: async () => {
 				proj = await fsOpen();
 				editor.setProject(proj);
-				editingFile = proj.getStartingFile();
+				editingFile = proj.getDefaultMain();
 				m.redraw();
 				editor.focus();
 			}
@@ -206,7 +203,7 @@ const Tools = {
 	view: () => [
 		m('.tool', {
 			onclick: () => {
-				play(proj);
+				playProj();
 				editor.focus();
 			}
 		}, 'play'),
