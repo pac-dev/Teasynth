@@ -26,6 +26,7 @@ body {
 	display: grid;
 	grid-template-columns: 1fr;
 	grid-template-rows: min-content 1fr;
+	overflow-y: auto;
 }
 .project_head {
 	display: grid;
@@ -155,13 +156,11 @@ input.renamer.renaming {
 	display: block;
 }
 .project_files > .filebtn.add {
+	display: block;
 	color: #7d7;
 }
 .project_files > .filebtn.add:after {
 	content: '+';
-}
-.project_files:hover > .filebtn.add {
-	display: block;
 }
 
 

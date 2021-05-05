@@ -1,6 +1,7 @@
 import { loadScript } from "./network.js";
 import { ProjDir, Project, ProjFile } from './Project.js';
 import { registerSporth } from './sporthEditor.js';
+import { getFaustProviders } from './lib/faust/faustlang.js';
 
 // always call model.setEOL immediately after model.setValue
 
@@ -10,6 +11,7 @@ const createModel = f => {
 	let lang;
 	if (f.path.endsWith('.js')) lang = 'javascript';
 	else if (f.path.endsWith('.sp')) lang = 'sporth';
+	else if (f.path.endsWith('.dsp')) lang = 'faust';
 	const model = monaco.editor.createModel(f.content, lang, uri);
 	model.setEOL(monaco.editor.EndOfLineSequence.LF);
 	model.onDidChangeContent(() => {
@@ -135,6 +137,13 @@ export class CodeEditor {
 				}
 			});
 			registerSporth();
+			monaco.languages.register({ id: 'faust' });
+			getFaustProviders().then(providers => {
+				const {hoverProvider, tokensProvider, completionItemProvider} = providers;
+				monaco.languages.setMonarchTokensProvider('faust', tokensProvider);
+				monaco.languages.registerCompletionItemProvider('faust', completionItemProvider);
+				monaco.languages.registerHoverProvider('faust', hoverProvider);
+			});
 			this.ready = true;
 			this.updateFiles();
 			this.shortcuts.forEach(s => this.loadedAddShortcut(...s));
