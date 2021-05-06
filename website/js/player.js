@@ -1,4 +1,5 @@
 import { Project, ProjFile } from './Project.js';
+import { guest } from '../platform.js';
 
 /** @type {ServiceWorker} */
 let service;
@@ -68,23 +69,14 @@ export const play = async (proj, main) => {
 	const files = Object.fromEntries([...proj.files].map(f => [
 		buildId+'/'+f.path, f.content
 	]));
-	const mainDir = main.parent.path;
-	const trackRelativeKey = file => JSON.stringify(
-		file.path.substring(mainDir.length+1)
-	);
-	let metaFile = `
-	const fileContents = {};
-	export const getFile = path => fileContents[path];`;
-	for (let file of main.parent.descendants) {
-		if (file.content.length > 100000) continue;
-		metaFile += `
-		fileContents[${trackRelativeKey(file)}] = ${JSON.stringify(file.content)};
-		`;
-	}
-	files[`${buildId}/${mainDir}/generated/project.js`] = metaFile;
 	const mainUrl = `${urlBase}${buildId}/${main.path}`;
 	await serviceCommand({ type: 'addBuild', buildId, files});
+
+	guest.port = undefined;
 	const preRun = await import(mainUrl);
+	const preChannel = new MessageChannel();
+	guest.port = preChannel.port1;
+	initHostPort(proj, main, preChannel.port2);
 	const sampleRate = preRun.sampleRate ?? 44100;
 	if (!preRun.process) throw new Error('main.js must export a "process" function!');
 	let preOut = await preRun.process();
@@ -125,14 +117,17 @@ export const play = async (proj, main) => {
 	const processorName = 'MainProcessor' + processorId();
 	const shim = `
 	import { process } from '${mainUrl}';
+	import { guest } from '${urlBase}platform.js';
 	class MainProcessor extends AudioWorkletProcessor {
 		constructor(options) {
 			super(options);
 			this.port.onmessage = async event => {
-				if (event.data !== 'init main') return;
-				${assignMain}
-				this.port.postMessage('main ready');
+				if (event.data.type === 'init main') {
+					${assignMain}
+					this.port.postMessage({type: 'main ready'});
+				}
 			}
+			guest.port = this.port;
 		}
 		process(inputs, outputs, parameters) {
 			const channels = outputs[0];
@@ -157,16 +152,39 @@ export const play = async (proj, main) => {
 		numberOfInputs: 0,
 		outputChannelCount: [2]
 	});
+	initHostPort(proj, main, mainNode.port);
 	await new Promise(resolve => {
 		const msgListener = event => {
-			if (event.data !== 'main ready') return;
+			if (event.data.type !== 'main ready') return;
 			mainNode.port.removeEventListener('message', msgListener);
 			resolve();
 		};
 		mainNode.port.addEventListener('message', msgListener);
 		mainNode.port.start();
-		mainNode.port.postMessage('init main');
+		mainNode.port.postMessage({type: 'init main'});
 	});
 	mainNode.connect(audioContext.destination);
 	await audioContext.resume();
+};
+
+/**
+ * @param {Project} proj
+ * @param {ProjFile} main
+ * @param {MessagePort} port
+ */
+const initHostPort = (proj, main, port) => {
+	const runHostCmd = async data => {
+		const resp = {type: 'hostResp', cmdId: data.cmdId};
+		if (data.cmd === 'getMainRelative') {
+			resp.content = main.relativeFile(data.path).content;
+		} else {
+			throw new Error('unknown host command: '+data.cmd);
+		}
+		port.postMessage(resp);
+	}
+	const msgListener = event => {
+		if (event.data.type === 'runHostCmd') runHostCmd(event.data);
+	};
+	port.addEventListener('message', msgListener);
+	port.start();
 };

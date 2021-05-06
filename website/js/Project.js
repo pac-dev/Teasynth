@@ -48,6 +48,33 @@ export class ProjFile {
 			if (ret) return ret;
 		}
 	}
+	relativeFile(relPath) {
+		const components = relPath.split('/');
+		const tgtName = components.pop();
+		let dir = this.parent;
+		for (let comp of components) {
+			if (comp === '.') {
+				continue;
+			} else if (comp === '..') {
+				dir = dir.parent;
+				if (dir === undefined) {
+					throw new Error(`Can't find relative ${relPath} because it goes above project root!`);
+				}
+			} else {
+				dir = dir.findChild(comp);
+				if (dir === undefined) {
+					throw new Error(`Can't find relative ${relPath} because "${comp}" doesn't exist!`);
+				} else if (!(dir instanceof ProjDir)) {
+					throw new Error(`Can't find relative ${relPath} because "${comp}" is not a directory!`);
+				}
+			}
+		}
+		const ret = dir.findChild(tgtName);
+		if (ret === undefined) {
+			throw new Error(`Can't find relative ${relPath} because "${tgtName}" doesn't exist!`);
+		}
+		return ret;
+	}
 	remove() {
 		if (!this.parent) throw new Error('Tried removing orphan '+this.name);
 		this.parent.removeChild(this);
