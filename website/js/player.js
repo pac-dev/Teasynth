@@ -1,5 +1,6 @@
 import { Project, ProjFile } from './Project.js';
 import { guest } from '../platform.js';
+import { compileFaust } from './faustCompiler.js';
 
 /** @type {ServiceWorker} */
 let service;
@@ -177,6 +178,10 @@ const initHostPort = (proj, main, port) => {
 		const resp = {type: 'hostResp', cmdId: data.cmdId};
 		if (data.cmd === 'getMainRelative') {
 			resp.content = main.relativeFile(data.path).content;
+		} else if (data.cmd === 'compileFaust') {
+			const comp = await compileFaust(data.code);
+			resp.ui8Code = comp.ui8Code;
+			resp.dspMeta = comp.dspMeta;
 		} else {
 			throw new Error('unknown host command: '+data.cmd);
 		}
