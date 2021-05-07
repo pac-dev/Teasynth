@@ -180,6 +180,7 @@ const TopLinks = {
 				proj = await fsOpen();
 				editor.setProject(proj);
 				editingFile = proj.getDefaultMain();
+				proj.root.collapseDescendants();
 				m.redraw();
 				editor.focus();
 			}

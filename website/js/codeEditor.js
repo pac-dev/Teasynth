@@ -9,7 +9,8 @@ import { getFaustProviders } from './lib/faust/faustlang.js';
 const createModel = f => {
 	const uri = monaco.Uri.file('/'+f.path);
 	let lang;
-	if (f.path.endsWith('.js')) lang = 'javascript';
+	if (f.content.length > 100000) lang = 'text/plain';
+	else if (f.path.endsWith('.js')) lang = 'javascript';
 	else if (f.path.endsWith('.sp')) lang = 'sporth';
 	else if (f.path.endsWith('.dsp')) lang = 'faust';
 	const model = monaco.editor.createModel(f.content, lang, uri);

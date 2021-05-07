@@ -143,6 +143,11 @@ export class ProjDir extends ProjFile {
 			}
 		}};
 	}
+	collapseDescendants() {
+		[...this.descendants].filter(f => f instanceof ProjDir).forEach(
+			dir => { dir.collapsed = true; }
+		);
+	}
 }
 
 export class Project {
