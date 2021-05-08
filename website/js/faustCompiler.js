@@ -35,10 +35,10 @@ const getFaustPromise = () => new Promise(resolve => {
  * @param {string} factoryName - Class name of the source code
  * @param {string} code - dsp source code
  * @param {string[]} argv - Array of parameters to be given to the Faust compiler
- * @param {boolean} internalMemory - Use internal Memory flag, false for poly, true for mono(phonic?)
+ * @param {boolean} internalMemory - Use internal Memory flag, false for poly, true for mono(phonic)
  * @returns {Object} - ui8Code is wasm bytecode, helpersCode is C (?) code to extract metadata from
  */
-const compileCode = (factoryName, code, argv=[], internalMemory=true) => {
+const compileCode = (factoryName, code, argv=[], internalMemory) => {
     const codeSize = em.lengthBytesUTF8(code) + 1;
     const $code = em._malloc(codeSize);
     const name = "FaustDSP";
@@ -109,10 +109,10 @@ const factoryId = (() => {
 	return () => 'fact'+(++count);
 })();
 
-export const compileFaust = async code => {	
+export const compileFaust = async (code, internalMemory) => {	
 	if (!faustPromise) faustPromise = getFaustPromise();
 	await faustPromise;
-	const {ui8Code, helpersCode} = compileCode(factoryId(), code);
+	const {ui8Code, helpersCode} = compileCode(factoryId(), code, [], internalMemory);
 	const json = helpersCode.match(/getJSON\w+?\(\)[\s\n]*{[\s\n]*return[\s\n]*'(\{.+?)';}/)[1].replace(/\\'/g, "'");
 	const dspMeta = JSON.parse(json);
 	return {ui8Code, dspMeta};

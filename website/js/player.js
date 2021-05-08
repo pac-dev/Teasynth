@@ -179,7 +179,7 @@ const initHostPort = (proj, main, port) => {
 		if (data.cmd === 'getMainRelative') {
 			resp.content = main.relativeFile(data.path).content;
 		} else if (data.cmd === 'compileFaust') {
-			const comp = await compileFaust(data.code);
+			const comp = await compileFaust(data.code, data.internalMemory);
 			resp.ui8Code = comp.ui8Code;
 			resp.dspMeta = comp.dspMeta;
 		} else {
