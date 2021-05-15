@@ -1,5 +1,4 @@
 import { Project, ProjFile } from './Project.js';
-import { guest } from '../platform.js';
 import { compileFaust } from './faustCompiler.js';
 
 /** @type {ServiceWorker} */
@@ -57,6 +56,8 @@ export const stop = async () => {
 	buildId = undefined;
 };
 
+let wantRate = 44100;
+
 /**
  * @param {Project} proj
  * @param {ProjFile} main
@@ -71,60 +72,68 @@ export const play = async (proj, main) => {
 	]));
 	const mainUrl = `${urlBase}${buildId}/${main.path}`;
 	await serviceCommand({ type: 'addBuild', buildId, files});
-
-	guest.port = undefined;
-	const preRun = await import(mainUrl);
-	const preChannel = new MessageChannel();
-	guest.port = preChannel.port1;
-	initHostPort(proj, main, preChannel.port2);
-	const sampleRate = preRun.sampleRate ?? 44100;
-	if (!preRun.process) throw new Error('main.js must export a "process" function!');
-	let preOut = await preRun.process();
-	let isAsync = false;
-	if (typeof preOut === 'function') {
-		preOut = preOut();
-		isAsync = true;
-	}
-	let processWrapper;
-	if (typeof preOut === 'number') {
-		processWrapper = `
-		const s = this.mainProcess();
-		channels[0][i] = s;
-		channels[1][i] = s;`;
-	} else if (preOut.length === 1) {
-		processWrapper = `
-		const s = this.mainProcess()[0];
-		channels[0][i] = s;
-		channels[1][i] = s;`;
-	} else if (preOut.length === 2) {
-		processWrapper = `
-		const [s1, s2] = this.mainProcess();
-		channels[0][i] = s1;
-		channels[1][i] = s2;`;
-	} else throw new Error(`process returned ${preOut} (${typeof preOut})! `
-		+'It should return a number or an array of one or two numbers! '
-		+'or, you know, a promise that returns a function that returns one of those things. '
-		+'any questions?'
-	);
-	let assignMain;
-	if (isAsync) {
-		assignMain = `
-		this.mainProcess = await process();`;
-	} else {
-		assignMain = `
-		this.mainProcess = process;`;
-	}
 	const processorName = 'MainProcessor' + processorId();
 	const shim = `
-	import { process } from '${mainUrl}';
+	import * as mainModule from '${mainUrl}';
 	import { guest } from '${urlBase}platform.js';
+
+	let firstFrame;
+	let processFrame = () => {
+		throw new Error('i suck, ep.1');
+	};
+	let frame2channels = (frame, channels, i) => {
+		throw new Error('i suck, ep.2');
+	};
+	let cruiseChannels = (channels, i) => {
+		frame2channels(processFrame(), channels, i);
+	};
+	let fillChannels = (channels, i) => {
+		frame2channels(firstFrame, channels, i);
+		fillChannels = cruiseChannels;
+	};
+	
+	const init = async port => {
+		const wantRate = mainModule.sampleRate ?? 44100;
+		if (wantRate !== sampleRate) {
+			port.postMessage({type: 'wrong samplerate', wantRate});
+			return;
+		}
+		if (!mainModule.process) throw new Error('main.js must export a "process" function!');
+		processFrame = mainModule.process;
+		firstFrame = await processFrame();
+		if (typeof firstFrame === 'function') {
+			processFrame = firstFrame;
+			firstFrame = processFrame();
+		}
+		if (typeof firstFrame === 'number') {
+			frame2channels = (frame, channels, i) => {
+				channels[0][i] = frame;
+				channels[1][i] = frame;
+			}
+		} else if (firstFrame.length === 1) {
+			frame2channels = (frame, channels, i) => {
+				channels[0][i] = frame[0];
+				channels[1][i] = frame[0];
+			}
+		} else if (firstFrame.length === 2) {
+			frame2channels = (frame, channels, i) => {
+				channels[0][i] = frame[0];
+				channels[1][i] = frame[1];
+			}
+		} else throw new Error('process returned '+firstFrame+' ('+(typeof firstFrame)+')! '
+			+'It should return a number or an array of one or two numbers! '
+			+'or, you know, a promise that returns a function that returns one of those things. '
+			+'any questions?'
+		);
+		port.postMessage({type: 'main ready'});
+	};
+	
 	class MainProcessor extends AudioWorkletProcessor {
 		constructor(options) {
 			super(options);
-			this.port.onmessage = async event => {
+			this.port.onmessage = event => {
 				if (event.data.type === 'init main') {
-					${assignMain}
-					this.port.postMessage({type: 'main ready'});
+					init(this.port);
 				}
 			}
 			guest.port = this.port;
@@ -132,20 +141,20 @@ export const play = async (proj, main) => {
 		process(inputs, outputs, parameters) {
 			const channels = outputs[0];
 			for (let i=0; i<channels[0].length; i++) {
-				${processWrapper}
+				fillChannels(channels, i);
 			}
 			return true;
 		}
 	}
 	registerProcessor('${processorName}', MainProcessor);`;
 	const shimUrl = URL.createObjectURL(new Blob([shim], {type: 'application/javascript'}));
-	if (audioContext && audioContext.sampleRate !== sampleRate) {
+	if (audioContext && audioContext.sampleRate !== wantRate) {
 		audioContext.close();
 		audioContext = undefined;
 	}
-	if (!audioContext) audioContext = new AudioContext({sampleRate, latencyHint: 1});
-	if (audioContext.sampleRate !== sampleRate)
-		throw new Error(`Tried to set samplerate to ${sampleRate}, got ${audioContext.sampleRate} instead.`);
+	if (!audioContext) audioContext = new AudioContext({sampleRate: wantRate}); // , latencyHint: 1
+	if (audioContext.sampleRate !== wantRate)
+		throw new Error(`Tried to set samplerate to ${wantRate}, got ${audioContext.sampleRate} instead.`);
 	if (firstBuild) console.log('Base latency: '+(Math.floor(audioContext.baseLatency*1000)/1000));
 	await audioContext.suspend(); // ensure process doesn't get called before ready
 	await audioContext.audioWorklet.addModule(shimUrl);
@@ -153,28 +162,36 @@ export const play = async (proj, main) => {
 		numberOfInputs: 0,
 		outputChannelCount: [2]
 	});
-	initHostPort(proj, main, mainNode.port);
-	await new Promise(resolve => {
+	initHostPort(main, mainNode.port);
+	const success = await new Promise(resolve => {
 		const msgListener = event => {
-			if (event.data.type !== 'main ready') return;
-			mainNode.port.removeEventListener('message', msgListener);
-			resolve();
+			if (event.data.type === 'main ready') {
+				mainNode.port.removeEventListener('message', msgListener);
+				resolve(true);
+			} else if (event.data.type === 'wrong samplerate') {
+				console.log(`Changing samplerate from ${wantRate} to ${event.data.wantRate}.`)
+				wantRate = event.data.wantRate;
+				mainNode.port.removeEventListener('message', msgListener);
+				resolve(false);
+			}
 		};
 		mainNode.port.addEventListener('message', msgListener);
 		mainNode.port.start();
 		mainNode.port.postMessage({type: 'init main'});
 	});
+	if (!success) {
+		return play(proj, main); // risky line of the day
+	}
 	mainNode.connect(audioContext.destination);
 	await audioContext.resume();
 	firstBuild = false;
 };
 
 /**
- * @param {Project} proj
  * @param {ProjFile} main
  * @param {MessagePort} port
  */
-const initHostPort = (proj, main, port) => {
+const initHostPort = (main, port) => {
 	const runHostCmd = async data => {
 		const resp = {type: 'hostResp', cmdId: data.cmdId};
 		if (data.cmd === 'getMainRelative') {
