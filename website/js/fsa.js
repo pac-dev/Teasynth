@@ -51,7 +51,7 @@ export const fsSave = async proj => {
 				deleteEntry(fsDir, fsEntry);
 				continue;
 			}
-			if ((projChild instanceof ProjDir) !== (fsEntry.kind === 'directory')) {
+			if (projChild.isDir !== (fsEntry.kind === 'directory')) {
 				// wrong type (directory / non-directory): delete it and keep it in missing files
 				numDeleted++;
 				deleteEntry(fsDir, fsEntry);
@@ -79,7 +79,7 @@ export const fsSave = async proj => {
 		}
 		// projChildren now only contains missing files
 		for (const projChild of projChildren) {
-			if (projChild instanceof ProjDir) {
+			if (projChild.isDir) {
 				// Missing directory: create and iterate it
 				numCreated++;
 				const newFsDir = await fsDir.getDirectoryHandle(projChild.name, {create: true});

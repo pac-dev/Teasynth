@@ -45,7 +45,7 @@ export class CodeEditor {
 		if (this.ready) this.loadedAddShortcut(shortcut, label, run);
 	}
 	updateFiles() {
-		const projFiles = [...this.proj.files].filter(f => !(f instanceof ProjDir));
+		const projFiles = [...this.proj.files].filter(f => !f.isDir);
 		const projIds = projFiles.map(f => f.id);
 		for (let file of projFiles) {
 			const oldModel = this.fileModels[file.id];

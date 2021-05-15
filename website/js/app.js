@@ -21,7 +21,7 @@ window.getEditor = () => editor;
 editor.addShortcut('Alt+KEY_1', 'Play', () => playProj());
 editor.addShortcut('Alt+KEY_2', 'Stop', () => stop());
 editor.addShortcut('Alt+KEY_3', 'Previous File', () => {
-	const files = [...proj.files].filter(f => !(f instanceof ProjDir));
+	const files = [...proj.files].filter(f => !f.isDir);
 	if (files.length < 2) return;
 	let currentIdx = files.findIndex(f => f == editingFile);
 	if (currentIdx === undefined) return;
@@ -29,7 +29,7 @@ editor.addShortcut('Alt+KEY_3', 'Previous File', () => {
 	m.redraw();
 });
 editor.addShortcut('Alt+KEY_4', 'Next File', () => {
-	const files = [...proj.files].filter(f => !(f instanceof ProjDir));
+	const files = [...proj.files].filter(f => !f.isDir);
 	if (files.length < 2) return;
 	let currentIdx = files.findIndex(f => f == editingFile);
 	if (currentIdx === undefined) return;
@@ -87,7 +87,7 @@ const makeRenamer = ({obj, getValue, setValue}) => {
 /** @param {ProjFile} f */
 const decorators = f => {
 	const ret = [...Array(f.numAncestors)].map(_ => m('.parent_bar'));
-	if (!(f instanceof ProjDir)) return ret;
+	if (!f.isDir) return ret;
 	ret.push(m(
 		f.collapsed ? '.collapser.closed' : '.collapser.open',
 		{onclick: () => {
@@ -106,7 +106,7 @@ const fileButtons = f => {
 			editor.focus();
 		}
 	})];
-	if (!(f instanceof ProjDir)) return ret;
+	if (!f.isDir) return ret;
 	ret.push(m('.filebtn.add', {
 		onclick: () => newFileInDir(f)
 	}));
@@ -123,7 +123,7 @@ const makeFileItem = f => m(
 		...decorators(f),
 		m('.path', {
 			onclick: () => {
-				if (!(f instanceof ProjDir)) editingFile = f;
+				if (!f.isDir) editingFile = f;
 				editor.focus();
 			},
 			ondblclick: () => {

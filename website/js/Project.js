@@ -17,6 +17,7 @@ export class ProjFile {
 		this.id = fileId();
 		this.renaming = false;
 		this.editing = false;
+		this.isDir = false;
 	}
 	get name() { return this._name; }
 	set name(v) {
@@ -64,7 +65,7 @@ export class ProjFile {
 				dir = dir.findChild(comp);
 				if (dir === undefined) {
 					throw new Error(`Can't find relative ${relPath} because "${comp}" doesn't exist!`);
-				} else if (!(dir instanceof ProjDir)) {
+				} else if (!dir.isDir) {
 					throw new Error(`Can't find relative ${relPath} because "${comp}" is not a directory!`);
 				}
 			}
@@ -83,10 +84,11 @@ export class ProjFile {
 
 export class ProjDir extends ProjFile {
 	constructor(name) {
-		super(name, '', true);
+		super(name, '');
 		/** @type {Array.<ProjFile>} */
 		this._children = [];
 		this.collapsed = false;
+		this.isDir = true;
 	}
 	/**
 	 * @param {ProjFile} file
@@ -117,7 +119,10 @@ export class ProjDir extends ProjFile {
 		return file;
 	}
 	sortChildren() {
-		this._children.sort((a, b) => a.path.localeCompare(b.path));
+		this._children.sort((a, b) => {
+			if (a.isDir !== b.isDir) return Math.sign(b.isDir - a.isDir);
+			else return a.path.localeCompare(b.path)
+		});
 	}
 	/** @param {String} name */
 	findChild(name) {
@@ -133,7 +138,7 @@ export class ProjDir extends ProjFile {
 			/** @param {ProjFile} file */
 			function* visit(file) {
 				yield file;
-				if (!(file instanceof ProjDir)) return;
+				if (!file.isDir) return;
 				for (let child of file.children) {
 					yield* visit(child);
 				}
@@ -144,7 +149,7 @@ export class ProjDir extends ProjFile {
 		}};
 	}
 	collapseDescendants() {
-		[...this.descendants].filter(f => f instanceof ProjDir).forEach(
+		[...this.descendants].filter(f => f.isDir).forEach(
 			dir => { dir.collapsed = true; }
 		);
 	}
@@ -170,7 +175,7 @@ export class Project {
 			} else {
 				parent = parent.addChild(new ProjDir(comp));
 			}
-			if (!(parent instanceof ProjDir)) {
+			if (!parent.isDir) {
 				throw new Error(`Tried adding ${path}, but it clobbers non-directory ${parent.path}!`)
 			}
 		}
@@ -187,7 +192,7 @@ export class Project {
 	getDefaultMain() {
 		let first;
 		for (let file of this.files) {
-			if (file instanceof ProjDir) continue;
+			if (file.isDir) continue;
 			if (!first) first = file;
 			if (file.name === 'main.js') return file;
 		}
