@@ -8,7 +8,7 @@ let service;
 let audioContext;
 /** @type {AudioWorkletNode} */
 let mainNode;
-let buildId, urlBase;
+let buildId, urlBase, firstBuild = true;
 
 const serviceCommand = async cmdData => {
 	const cmdId = Math.random().toString(36).substring(7);
@@ -53,7 +53,7 @@ export const stop = async () => {
 		audioContext.close();
 		audioContext = undefined;
 	}
-	await serviceCommand({type: 'removeBuild', buildId});
+	if (buildId) await serviceCommand({type: 'removeBuild', buildId});
 	buildId = undefined;
 };
 
@@ -62,11 +62,10 @@ export const stop = async () => {
  * @param {ProjFile} main
  */
 export const play = async (proj, main) => {
-	console.log('playing '+main.path);
+	console.log('Playing '+main.path);
 	if (!service) throw new Error('Service worker not ready.');
 	await stop();
 	buildId = Math.random().toString(36).substring(7);
-	console.log('new build id: '+buildId);
 	const files = Object.fromEntries([...proj.files].map(f => [
 		buildId+'/'+f.path, f.content
 	]));
@@ -144,9 +143,10 @@ export const play = async (proj, main) => {
 		audioContext.close();
 		audioContext = undefined;
 	}
-	if (!audioContext) audioContext = new AudioContext({sampleRate});
+	if (!audioContext) audioContext = new AudioContext({sampleRate, latencyHint: 1});
 	if (audioContext.sampleRate !== sampleRate)
 		throw new Error(`Tried to set samplerate to ${sampleRate}, got ${audioContext.sampleRate} instead.`);
+	if (firstBuild) console.log('Base latency: '+(Math.floor(audioContext.baseLatency*1000)/1000));
 	await audioContext.suspend(); // ensure process doesn't get called before ready
 	await audioContext.audioWorklet.addModule(shimUrl);
 	mainNode = new AudioWorkletNode(audioContext, processorName, {
@@ -166,6 +166,7 @@ export const play = async (proj, main) => {
 	});
 	mainNode.connect(audioContext.destination);
 	await audioContext.resume();
+	firstBuild = false;
 };
 
 /**

@@ -3,17 +3,16 @@
 if (!self.builds) self.builds = {};
 
 const addBuild = cmdData => {
-	console.log('adding files for '+cmdData.buildId);
+	console.log('Adding files for '+cmdData.buildId);
 	self.builds[cmdData.buildId] = cmdData.files;
 };
 
 const removeBuild = cmdData => {
-	console.log('removing files for '+cmdData.buildId);
+	console.log('Removing files for '+cmdData.buildId);
 	delete self.builds[cmdData.buildId];
 };
 
 self.addEventListener('install', e => {
-	console.log('installing');
 	self.skipWaiting()
 });
 
@@ -27,7 +26,6 @@ addEventListener('message', event => {
 	else if (cmdData.type === 'removeBuild')
 		removeBuild(cmdData);
 	else if (cmdData.type === 'claim') {
-		console.log('claiming control');
 		return self.clients.claim();
 	}
 	event.source.postMessage({type: 'commandCompleted', cmdId});
