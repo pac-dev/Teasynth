@@ -1,6 +1,6 @@
 import { CodeEditor } from './codeEditor.js';
 import { m } from './lib/mithrilModule.js';
-import { ProjDir, Project, ProjFile } from './Project.js';
+import { ProjDir, Project, ProjFile } from './shared/Project.js';
 import { initService, play, stop } from './player.js';
 import { fsOpen, fsSave, fsSaveAs, canSave } from './fsa.js';
 

@@ -1,4 +1,4 @@
-import Module from './lib/faust/libfaust-wasm.js';
+import Module from './libfaust-wasm.js';
 
 let libFaust, em, faustPromise;
 const getFaustPromise = () => new Promise(resolve => {

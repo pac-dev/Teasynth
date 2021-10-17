@@ -1,4 +1,4 @@
-import { Project, ProjFile, ProjDir } from './Project.js';
+import { Project, ProjFile, ProjDir } from './shared/Project.js';
 
 let currentDirHandle;
 

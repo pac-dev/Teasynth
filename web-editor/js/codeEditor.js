@@ -1,5 +1,5 @@
 import { loadScript } from "./network.js";
-import { ProjDir, Project, ProjFile } from './Project.js';
+import { Project, ProjFile } from './shared/Project.js';
 import { registerSporth } from './sporthEditor.js';
 import { getFaustProviders } from './lib/faust/faustlang.js';
 
