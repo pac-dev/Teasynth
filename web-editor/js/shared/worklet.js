@@ -1,9 +1,23 @@
 
-export const makeWorklet = (mainUrl, urlBase, processorName) => `
+export const makeWorklet = (mainUrl, platformUrl, processorName) => `
 	import * as mainModule from '${mainUrl}';
-	import { guest } from '${urlBase}platform.js';
+	import { platform } from '${platformUrl}';
 
-	let firstFrame;
+	const runHostCmd = (port, data) => new Promise(resolve => {
+		const cmdId = Math.random().toString(36).substring(7);
+		const msgListener = event => {
+			if (event.data.type !== 'hostResp' || event.data.cmdId !== cmdId) return;
+			port.removeEventListener('message', msgListener);
+			resolve(event.data);
+		};
+		port.addEventListener('message', msgListener);
+		port.start();
+		data.type = 'runHostCmd';
+		data.cmdId = cmdId;
+		port.postMessage(data);
+	});
+
+	let firstFrame, canFill = false;
 	let processFrame = () => {
 		throw new Error('i suck, ep.1');
 	};
@@ -14,6 +28,11 @@ export const makeWorklet = (mainUrl, urlBase, processorName) => `
 		frame2channels(processFrame(), channels, i);
 	};
 	let fillChannels = (channels, i) => {
+		if (!canFill) {
+			channels[0][i] = 0;
+			channels[1][i] = 0;
+			return;
+		}
 		frame2channels(firstFrame, channels, i);
 		fillChannels = cruiseChannels;
 	};
@@ -24,6 +43,14 @@ export const makeWorklet = (mainUrl, urlBase, processorName) => `
 			port.postMessage({type: 'wrong samplerate', wantRate});
 			return;
 		}
+		platform.getMainRelative = async path => {
+			const resp = await runHostCmd(port, {cmd: 'getMainRelative', path});
+			return resp.content;
+		};
+		platform.compileFaust = async (code, internalMemory) => {
+			return await runHostCmd(port, {cmd: 'compileFaust', code, internalMemory});
+		};
+		platform.initialized = true;
 		if (!mainModule.process) throw new Error('main.js must export a "process" function!');
 		processFrame = mainModule.process;
 		firstFrame = await processFrame();
@@ -51,6 +78,7 @@ export const makeWorklet = (mainUrl, urlBase, processorName) => `
 			+'or, you know, a promise that returns a function that returns one of those things. '
 			+'any questions?'
 		);
+		canFill = true;
 		port.postMessage({type: 'main ready'});
 	};
 	
@@ -62,7 +90,6 @@ export const makeWorklet = (mainUrl, urlBase, processorName) => `
 					init(this.port);
 				}
 			}
-			guest.port = this.port;
 		}
 		process(inputs, outputs, parameters) {
 			const channels = outputs[0];

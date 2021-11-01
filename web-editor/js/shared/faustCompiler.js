@@ -109,6 +109,19 @@ const factoryId = (() => {
 	return () => 'fact'+(++count);
 })();
 
+/**
+ * Get the compiled wasm and metadata for the Faust code. Note that the wasm
+ * actually exports a `getJSON` function to get the metadata, so we could avoid
+ * the hacky extraction here, but we would need to allocate memory before
+ * calling that function... and we need the metadata to know how much memory to
+ * allocate. This chicken and egg problem can be solved in different ways, the
+ * method used here is hacky but probably the most resource-efficient. A better
+ * fix might be for libfaust-wasm to provide the JSON directly.
+ * 
+ * @param {*} code 
+ * @param {*} internalMemory 
+ * @returns 
+ */
 export const compileFaust = async (code, internalMemory) => {	
 	if (!faustPromise) faustPromise = getFaustPromise();
 	await faustPromise;

@@ -1,25 +1,38 @@
 import { CodeEditor } from './codeEditor.js';
 import { m } from './lib/mithrilModule.js';
 import { ProjDir, Project, ProjFile } from './shared/Project.js';
-import { initService, play, stop } from './player.js';
+import { initService, devPlay, devStop } from './devPlayer.js';
 import { fsOpen, fsSave, fsSaveAs, canSave } from './fsa.js';
+import { exportTrack, zipify } from './shared/exporter.js';
 
 let proj = new Project('Untitled Project');
 proj.root.addChild(new ProjFile('main.js', "console.log('running in bread')"));
 let editingFile = proj.getDefaultMain();
 let lastMain = editingFile;
-const playProj = () => {
+const playCurrent = () => {
 	let main = editingFile.closestMain;
 	if (!main) main = lastMain;
 	if (!proj.includes(main)) throw new Error('No main file to play.');
 	lastMain = main;
-	play(proj, main);
+	devPlay(proj, main);
+};
+const exportCurrent = async () => {
+	let main = editingFile.closestMain;
+	if (!main) throw new Error('No main file to export.');
+	const files = await exportTrack(proj, main);
+	const blob = await zipify(files);
+	const fileURL = URL.createObjectURL(blob);
+	const a = document.createElement('A');
+	a.href = fileURL;
+	a.download = `${proj.name}_${main.parent.name}.zip`;
+	a.click();
+	editor.focus();
 };
 const editor = new CodeEditor(proj, editingFile.id);
 window.getProj = () => proj;
 window.getEditor = () => editor;
-editor.addShortcut('Alt+KEY_1', 'Play', () => playProj());
-editor.addShortcut('Alt+KEY_2', 'Stop', () => stop());
+editor.addShortcut('Alt+KEY_1', 'Play', () => playCurrent());
+editor.addShortcut('Alt+KEY_2', 'Stop', () => devStop());
 editor.addShortcut('Alt+KEY_3', 'Previous File', () => {
 	const files = [...proj.files].filter(f => !f.isDir);
 	if (files.length < 2) return;
@@ -204,16 +217,19 @@ const Tools = {
 	view: () => [
 		m('.tool', {
 			onclick: () => {
-				playProj();
+				playCurrent();
 				editor.focus();
 			}
 		}, 'play'),
 		m('.tool', {
 			onclick: () => {
-				stop();
+				devStop();
 				editor.focus();
 			}
-		}, 'stop')
+		}, 'stop'),
+		m('.tool', {
+			onclick: exportCurrent
+		}, 'export')
 	]
 };
 

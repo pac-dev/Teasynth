@@ -189,6 +189,16 @@ export class Project {
 		}
 		throw new Error('Search for missing ID: '+id);
 	}
+	findByPath(path) {
+		const components = path.split('/');
+		let pos = this.root;
+		for (let comp of components) {
+			if (!comp.length) continue;
+			pos = pos.findChild(comp);
+			if (!pos) throw new Error('Search for missing path: '+path);
+		}
+		return pos;
+	}
 	getDefaultMain() {
 		let first;
 		for (let file of this.files) {
