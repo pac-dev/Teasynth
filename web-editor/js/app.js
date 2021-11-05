@@ -1,7 +1,7 @@
 import { CodeEditor } from './codeEditor.js';
 import { m } from './lib/mithrilModule.js';
 import { ProjDir, Project, ProjFile } from './shared/Project.js';
-import { initService, devPlay, devStop } from './devPlayer.js';
+import { initService, devPlay, devStop, knownParams, mainTrack } from './devPlayer.js';
 import { fsOpen, fsSave, fsSaveAs, canSave } from './fsa.js';
 import { exportTrack, zipify } from './shared/exporter.js';
 
@@ -9,12 +9,13 @@ let proj = new Project('Untitled Project');
 proj.root.addChild(new ProjFile('main.js', "console.log('running in bread')"));
 let editingFile = proj.getDefaultMain();
 let lastMain = editingFile;
-const playCurrent = () => {
+const playCurrent = async () => {
 	let main = editingFile.closestMain;
 	if (!main) main = lastMain;
 	if (!proj.includes(main)) throw new Error('No main file to play.');
 	lastMain = main;
-	devPlay(proj, main);
+	await devPlay(proj, main);
+	m.redraw();
 };
 const exportCurrent = async () => {
 	let main = editingFile.closestMain;
@@ -233,15 +234,42 @@ const Tools = {
 	]
 };
 
+const Params = {
+	view: () => knownParams.map(par =>
+		m('.param', [
+			m('', [
+				m('', {
+					onclick: () => knownParams.splice(knownParams.indexOf(par), 1),
+					style: { display: 'inline' }
+				}, '[x] '),
+				` ${par.name}: ${Math.round(par.val*1000)/1000}`,
+			]),
+			m('input[type="range"]', {
+				min: par.min,
+				max: par.max,
+				step: (par.max - par.min)/1000,
+				value: par.val,
+				oninput(e) { 
+					par.val = e.target.value;
+					if (mainTrack) mainTrack.setParam(par.name, par.val);
+				}
+			}),
+		])
+	)
+};
+
 const Layout = {
-	view: () => m('.layout', [
-		m('.project_pane', [
-			m('.project_head', m(TopLinks)),
-			m('.project_files', m(FileList)),
+	view: () => [
+		m('.layout', [
+			m('.project_pane', [
+				m('.project_head', m(TopLinks)),
+				m('.project_files', m(FileList)),
+			]),
+			m('.code_pane', m(CodeContainer)),
+			m('.tool_pane', m(Tools))
 		]),
-		m('.code_pane', m(CodeContainer)),
-		m('.tool_pane', m(Tools))
-	])
+		m('.params', m(Params))
+	]
 };
 
 m.mount(document.body, Layout);

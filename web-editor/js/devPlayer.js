@@ -1,12 +1,13 @@
 import { Project, ProjFile } from './shared/Project.js';
 import { compileFaust } from './shared/faustCompiler.js';
 import { makeWorklet } from './shared/worklet.js';
-import { add, remove } from './shared/player.js';
+import { PlayingTrack, createTrack, removeTrack } from './shared/player.js';
 
 /** @type {ServiceWorker} */
 let service;
-/** @type {AudioWorkletNode} */
-let mainNode;
+/** @type {PlayingTrack} */
+export let mainTrack;
+export let knownParams = [];
 
 const processorId = (() => {
 	let count = 1;
@@ -45,9 +46,9 @@ export const initService = async _urlBase => {
 
 export const devStop = async () => {
 	if (!service) throw new Error('Service worker not ready.');
-	if (!mainNode) return;
-	remove(mainNode);
-	mainNode = undefined;
+	if (!mainTrack) return;
+	removeTrack(mainTrack, true);
+	mainTrack = undefined;
 	if (buildId) await serviceCommand({type: 'removeBuild', buildId});
 	buildId = undefined;
 };
@@ -79,5 +80,15 @@ export const devPlay = async (proj, main) => {
 			return [comp.ui8Code, comp.dspMeta];
 		}
 	};
-	mainNode = await add(shimUrl, processorName, callbacks);
+	const initParams = Object.fromEntries(knownParams.map(p => [p.name, p.val]));
+	mainTrack = await createTrack({url: shimUrl, processorName, callbacks, initParams});
+	for (let param of mainTrack.paramSpecs) {
+		const existingIdx = knownParams.findIndex(p => p.name === param.name);
+		if (existingIdx === -1) {
+			param.val = param.def;
+			knownParams.push(param);
+		} else {
+			Object.assign(knownParams[existingIdx], param);
+		}
+	}
 };

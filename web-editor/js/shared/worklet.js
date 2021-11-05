@@ -37,7 +37,7 @@ export const makeWorklet = (mainUrl, platformUrl, processorName) => `
 		fillChannels = cruiseChannels;
 	};
 	
-	const init = async port => {
+	const init = async (port, data) => {
 		const wantRate = mainModule.sampleRate ?? 44100;
 		if (wantRate !== sampleRate) {
 			port.postMessage({type: 'wrong samplerate', wantRate});
@@ -51,6 +51,15 @@ export const makeWorklet = (mainUrl, platformUrl, processorName) => `
 			return await runHostCmd(port, {cmd: 'compileFaust', code, internalMemory});
 		};
 		platform.initialized = true;
+		const paramSpecs = [];
+		for (let name of Object.keys(platform.params)) {
+			const param = platform.params[name];
+			paramSpecs.push({...param, name, setFn: false});
+			if (name in data.initParams) {
+				param.setFn(parseFloat(data.initParams[name]));
+			}
+		}
+		await runHostCmd(port, {cmd: 'defineParams', paramSpecs});
 		if (!mainModule.process) throw new Error('main.js must export a "process" function!');
 		processFrame = mainModule.process;
 		firstFrame = await processFrame();
@@ -79,6 +88,11 @@ export const makeWorklet = (mainUrl, platformUrl, processorName) => `
 			+'any questions?'
 		);
 		canFill = true;
+		port.addEventListener('message', event => {
+			if (event.data.type !== 'set param') return;
+			if (!(event.data.name in platform.params)) return;
+			platform.params[event.data.name].setFn(parseFloat(event.data.val));
+		});
 		port.postMessage({type: 'main ready'});
 	};
 	
@@ -87,7 +101,7 @@ export const makeWorklet = (mainUrl, platformUrl, processorName) => `
 			super(options);
 			this.port.onmessage = event => {
 				if (event.data.type === 'init main') {
-					init(this.port);
+					init(this.port, event.data);
 				}
 			}
 		}

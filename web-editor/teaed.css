@@ -183,3 +183,18 @@ input.renamer.renaming {
 .tool:hover {
 	background: #fff3;
 }
+
+
+/** params **/
+
+.params {
+	position: absolute;
+	bottom: 0;
+	right: 10rem;
+	background-color: #c5c5de;
+	touch-action: none;
+	user-select: none;
+}
+.param {
+	padding: 1rem;
+}

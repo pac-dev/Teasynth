@@ -1,73 +1,105 @@
 
 /** @type {AudioContext} */
-let audioContext;
-const playingNodes = [];
+export let audioContext;
+
+/** @type {Array.<PlayingTrack>} */
+const playingTracks = [];
+
+const defaultParamSpec = {
+	name: 'unnamed param?',
+	min: 0,
+	max: 1,
+	def: 0
+};
+
+export class PlayingTrack {
+	constructor({url, processorName, callbacks, initParams={}}) {
+		this.url = url;
+		this.processorName = processorName;
+		this.callbacks = callbacks;
+		this.initParams = initParams;
+	}
+	async init() {
+		await audioContext.audioWorklet.addModule(this.url);
+		const node = new AudioWorkletNode(audioContext, this.processorName, {
+			numberOfInputs: 0,
+			outputChannelCount: [2]
+		});
+		const playResult = {};
+		this.node = node;
+		this.playResult = playResult;
+		this.paramSpecs = [];
+		const rcvHostCmd = async data => {
+			const resp = {type: 'hostResp', cmdId: data.cmdId};
+			if (data.cmd === 'getMainRelative') {
+				resp.content = await this.callbacks.getMainRelative(data.path);
+			} else if (data.cmd === 'compileFaust') {
+				const ret = await this.callbacks.compileFaust(data.code, data.internalMemory);
+				[resp.ui8Code, resp.dspMeta] = ret;
+			} else if (data.cmd === 'defineParams') {
+				this.paramSpecs = data.paramSpecs.map(d => Object.assign(
+					{}, defaultParamSpec, d
+				));
+			} else {
+				throw new Error('unknown host command: '+data.cmd);
+			}
+			node.port.postMessage(resp);
+		}
+		node.port.addEventListener('message', event => {
+			if (event.data.type === 'runHostCmd') rcvHostCmd(event.data);
+		});
+		await new Promise(resolve => {
+			const readyListener = event => {
+				if (event.data.type === 'main ready' || event.data.type === 'wrong samplerate') {
+					node.port.removeEventListener('message', readyListener);
+					// console.log(`Changing samplerate from ${wantRate} to ${event.data.wantRate}.`)
+					Object.assign(playResult, event.data);
+					resolve();
+				}
+			};
+			node.port.addEventListener('message', readyListener);
+			node.port.start();
+			node.port.postMessage({type: 'init main', initParams: this.initParams});
+		});
+	}
+	setParam(name, val) {
+		this.node.port.postMessage({type: 'set param', name, val});
+	}
+	stop() {
+		this.node.disconnect();
+	}
+}
+
+export const createTrack = async ({url, processorName, callbacks, initParams, wantRate=44100}) => {
+	if (!audioContext) initContext(wantRate);
+	const ret = new PlayingTrack({url, processorName, callbacks, initParams});
+	await ret.init();
+	if (ret.playResult.type === 'wrong samplerate') {
+		if (audioContext) throw new Error('Nodes require conflicting sample rates: '+processorName);
+		initContext(ret.playResult.wantRate);
+		await ret.init();
+	}
+	if (ret.playResult.type !== 'main ready') throw new Error('Error adding node: '+processorName);
+	ret.node.connect(audioContext.destination);
+	playingTracks.push(ret);
+	return ret;
+};
 
 /**
- * @param {AudioWorkletNode} node 
+ * @param {PlayingTrack} track 
  */
-export const remove = node => {
-	node.disconnect();
-	playingNodes.splice(playingNodes.indexOf(node), 1);
-	if (audioContext && !playingNodes.length) {
+export const removeTrack = (track, cleanContext=false) => {
+	track.stop();
+	playingTracks.splice(playingTracks.indexOf(track), 1);
+	if (cleanContext && audioContext && !playingTracks.length) {
 		audioContext.close();
 		audioContext = undefined;
 	}
 };
 
-const initContext = wantRate => {
+export const initContext = wantRate => {
 	audioContext = new AudioContext({sampleRate: wantRate}); // , latencyHint: 1
 	if (audioContext.sampleRate !== wantRate)
 		throw new Error(`Tried to set samplerate to ${wantRate}, got ${audioContext.sampleRate} instead.`);
 	console.log('Base latency: '+(Math.floor(audioContext.baseLatency*1000)/1000));
-};
-
-const initNode = async (url, processorName, callbacks) => {
-	await audioContext.audioWorklet.addModule(url);
-	const node = new AudioWorkletNode(audioContext, processorName, {
-		numberOfInputs: 0,
-		outputChannelCount: [2]
-	});
-	const runHostCmd = async data => {
-		const resp = {type: 'hostResp', cmdId: data.cmdId};
-		if (data.cmd === 'getMainRelative') {
-			resp.content = callbacks.getMainRelative(data.path);
-		} else if (data.cmd === 'compileFaust') {
-			const ret = await callbacks.compileFaust(data.code, data.internalMemory);
-			[resp.ui8Code, resp.dspMeta] = ret;
-		} else {
-			throw new Error('unknown host command: '+data.cmd);
-		}
-		node.port.postMessage(resp);
-	}
-	node.port.addEventListener('message', event => {
-		if (event.data.type === 'runHostCmd') runHostCmd(event.data);
-	});
-	return await new Promise(resolve => {
-		const readyListener = event => {
-			if (event.data.type === 'main ready' || event.data.type === 'wrong samplerate') {
-				node.port.removeEventListener('message', readyListener);
-				// console.log(`Changing samplerate from ${wantRate} to ${event.data.wantRate}.`)
-				resolve([node, event.data]);
-			}
-		};
-		node.port.addEventListener('message', readyListener);
-		node.port.start();
-		node.port.postMessage({type: 'init main'});
-	});
-};
-
-export const add = async (url, processorName, callbacks, wantRate=44100) => {
-	if (!audioContext) initContext(wantRate);
-	let [node, playResult] = await initNode(url, processorName, callbacks);
-	if (playResult.type === 'wrong samplerate') {
-		remove(node);
-		if (audioContext) throw new Error('Nodes require conflicting sample rates: '+processorName);
-		initContext(playResult.wantRate);
-		[node, playResult] = await initNode(url, processorName, callbacks);
-	}
-	if (playResult.type !== 'main ready') throw new Error('Error adding node: '+processorName);
-	node.connect(audioContext.destination);
-	playingNodes.push(node);
-	return node;
 };
