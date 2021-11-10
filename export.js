@@ -49,13 +49,18 @@ const walkFs = (fsPath, projDir) => {
 console.log('reading input project...');
 walkFs(Deno.args[0], proj.root);
 
-const mains = [...proj.files].filter(f => f.name === 'main.js');
-for (let main of mains) {
+for (let main of proj.files) {
+	if (main.name !== 'main.js') continue;
+	if (main.path.includes('failed')) continue;
 	const exFiles = await exportTrack(proj, main, esbuild);
 	const tPath = outDir+main.parent.path;
 	Deno.mkdirSync(tPath, {recursive: true});
 	for (let filename of Object.keys(exFiles)) {
-		Deno.writeTextFileSync(tPath+'/'+filename, exFiles[filename])
+		if (typeof exFiles[filename] === 'string') {
+			Deno.writeTextFileSync(tPath+'/'+filename, exFiles[filename])
+		} else {
+			Deno.writeFileSync(tPath+'/'+filename, exFiles[filename])
+		}
 	}
 }
 console.log('done.');
