@@ -187,14 +187,20 @@ input.renamer.renaming {
 
 /** params **/
 
-.params {
+.params_corner {
 	position: absolute;
 	bottom: 0;
 	right: 10rem;
+	pointer-events: none;
+}
+.params_track {
 	background-color: #c5c5de;
+	margin: 1rem;
+	display: inline-block;
+	pointer-events: auto;
 	touch-action: none;
 	user-select: none;
 }
-.param {
+.param, .params_title {
 	padding: 1rem;
 }

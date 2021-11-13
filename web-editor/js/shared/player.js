@@ -1,7 +1,3 @@
-
-/** @type {AudioContext} */
-export let audioContext;
-
 /** @type {Array.<PlayingTrack>} */
 const playingTracks = [];
 
@@ -13,15 +9,16 @@ const defaultParamSpec = {
 };
 
 export class PlayingTrack {
-	constructor({url, processorName, callbacks, initParams={}}) {
+	constructor({url, processorName, callbacks, audioContext, initParams={}}) {
 		this.url = url;
 		this.processorName = processorName;
 		this.callbacks = callbacks;
 		this.initParams = initParams;
+		this.audioContext = audioContext;
 	}
 	async init() {
-		await audioContext.audioWorklet.addModule(this.url);
-		const node = new AudioWorkletNode(audioContext, this.processorName, {
+		await this.audioContext.audioWorklet.addModule(this.url);
+		const node = new AudioWorkletNode(this.audioContext, this.processorName, {
 			numberOfInputs: 0,
 			outputChannelCount: [2]
 		});
@@ -66,17 +63,27 @@ export class PlayingTrack {
 		this.node.port.postMessage({type: 'set param', name, val});
 	}
 	stop() {
-		this.node.disconnect();
+		// this.node.disconnect();
+		this.audioContext.close();
 	}
 }
 
+const initContext = wantRate => {
+	const audioContext = new AudioContext({sampleRate: wantRate}); // , latencyHint: 1
+	if (audioContext.sampleRate !== wantRate)
+		throw new Error(`Tried to set samplerate to ${wantRate}, got ${audioContext.sampleRate} instead.`);
+	console.log('Base latency: '+(Math.floor(audioContext.baseLatency*1000)/1000));
+	return audioContext;
+};
+
 export const createTrack = async ({url, processorName, callbacks, initParams, wantRate=44100}) => {
-	if (!audioContext) initContext(wantRate);
-	const ret = new PlayingTrack({url, processorName, callbacks, initParams});
+	let audioContext = initContext(wantRate);
+	const ret = new PlayingTrack({url, processorName, callbacks, audioContext, initParams});
 	await ret.init();
 	if (ret.playResult.type === 'wrong samplerate') {
 		if (audioContext) throw new Error('Nodes require conflicting sample rates: '+processorName);
-		initContext(ret.playResult.wantRate);
+		audioContext.close();
+		ret.audioContext = initContext(ret.playResult.wantRate);
 		await ret.init();
 	}
 	if (ret.playResult.type !== 'main ready') throw new Error('Error adding node: '+processorName);
@@ -91,15 +98,8 @@ export const createTrack = async ({url, processorName, callbacks, initParams, wa
 export const removeTrack = (track, cleanContext=false) => {
 	track.stop();
 	playingTracks.splice(playingTracks.indexOf(track), 1);
-	if (cleanContext && audioContext && !playingTracks.length) {
-		audioContext.close();
-		audioContext = undefined;
-	}
-};
-
-export const initContext = wantRate => {
-	audioContext = new AudioContext({sampleRate: wantRate}); // , latencyHint: 1
-	if (audioContext.sampleRate !== wantRate)
-		throw new Error(`Tried to set samplerate to ${wantRate}, got ${audioContext.sampleRate} instead.`);
-	console.log('Base latency: '+(Math.floor(audioContext.baseLatency*1000)/1000));
+	// if (cleanContext && audioContext && !playingTracks.length) {
+	// 	audioContext.close();
+	// 	audioContext = undefined;
+	// }
 };

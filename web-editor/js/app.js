@@ -1,7 +1,7 @@
 import { CodeEditor } from './codeEditor.js';
 import { m } from './lib/mithrilModule.js';
 import { ProjDir, Project, ProjFile } from './shared/Project.js';
-import { initService, devPlay, devReplay, devStop, knownParams, mainTrack, lastPlayMain } from './devPlayer.js';
+import { initService, devPlay, devStop, devTracks } from './devPlayer.js';
 import { fsOpen, fsSave, fsSaveAs, canSave } from './fsa.js';
 import { exportTrack, zipify } from './shared/exporter.js';
 
@@ -15,6 +15,13 @@ const playCurrent = async () => {
 	if (!proj.includes(main)) throw new Error('No main file to play.');
 	lastMain = main;
 	await devPlay(proj, main);
+	m.redraw();
+};
+const stopAll = async () => {
+	for (let dt of devTracks) {
+		if (dt.status !== 'playing') continue;
+		await devStop(dt);
+	}
 	m.redraw();
 };
 const exportCurrent = async () => {
@@ -33,7 +40,7 @@ const editor = new CodeEditor(proj, editingFile.id);
 window.getProj = () => proj;
 window.getEditor = () => editor;
 editor.addShortcut('Alt+KEY_1', 'Play', () => playCurrent());
-editor.addShortcut('Alt+KEY_2', 'Stop', () => devStop());
+editor.addShortcut('Alt+KEY_2', 'Stop', () => stopAll());
 editor.addShortcut('Alt+KEY_3', 'Previous File', () => {
 	const files = [...proj.files].filter(f => !f.isDir);
 	if (files.length < 2) return;
@@ -224,28 +231,43 @@ const Tools = {
 		}, 'play'),
 		m('.tool', {
 			onclick: () => {
-				devStop();
+				stopAll();
 				editor.focus();
 			}
 		}, 'stop'),
 		m('.tool', {
 			onclick: exportCurrent
 		}, 'export'),
-		m('.tool', {
-			onclick: () => {
-				devReplay();
-				editor.focus();
-			}
-		}, 'replay'),
+		// m('.tool', {
+		// 	onclick: () => {
+		// 		devReplay();
+		// 		editor.focus();
+		// 	}
+		// }, 'replay'),
 	]
 };
 
-const Params = {
-	view: () => knownParams.map(par =>
+/** @param {import('./devPlayer.js').DevTrack} dt */
+const trackStopper = dt => {
+	if (dt.status === 'playing') {
+		return m('', {
+			onclick: () => devStop(dt),
+			style: { display: 'inline', fontWeight: 600 }
+		}, '[stop] ');
+	}
+	return '('+dt.status+')';
+};
+
+/** @param {import('./devPlayer.js').DevTrack} dt */
+const ParamsTrack = dt => [
+	m('.params_title', [
+		dt.name+' ', trackStopper(dt)
+	]),
+	...dt.params.map(par =>
 		m('.param', [
 			m('', [
 				m('', {
-					onclick: () => knownParams.splice(knownParams.indexOf(par), 1),
+					onclick: () => dt.params.splice(dt.params.indexOf(par), 1),
 					style: { display: 'inline' }
 				}, '[x] '),
 				` ${par.name}: ${Math.round(par.val*1000)/1000}`,
@@ -257,11 +279,17 @@ const Params = {
 				value: par.val,
 				oninput(e) { 
 					par.val = e.target.value;
-					if (mainTrack) mainTrack.setParam(par.name, par.val);
+					if (dt.status === 'playing') dt.track.setParam(par.name, par.val);
 				}
 			}),
 		])
 	)
+];
+
+const ParamsCorner = {
+	view: () => devTracks
+		.filter(dt => dt.status === 'playing' || dt.params.length)
+		.map(devTrack => m('.params_track', ParamsTrack(devTrack)))
 };
 
 const Layout = {
@@ -274,7 +302,7 @@ const Layout = {
 			m('.code_pane', m(CodeContainer)),
 			m('.tool_pane', m(Tools))
 		]),
-		m('.params', m(Params))
+		m('.params_corner', m(ParamsCorner))
 	]
 };
 
