@@ -8,6 +8,7 @@ let service;
 /** @type {PlayingTrack} */
 export let mainTrack;
 export let knownParams = [];
+export let lastUrl, lastPlayMain, lastName;
 
 const processorId = (() => {
 	let count = 1;
@@ -47,30 +48,11 @@ export const initService = async _urlBase => {
 export const devStop = async () => {
 	if (!service) throw new Error('Service worker not ready.');
 	if (!mainTrack) return;
-	removeTrack(mainTrack, true);
+	removeTrack(mainTrack, false); // Persist the context to test instancing
 	mainTrack = undefined;
-	if (buildId) await serviceCommand({type: 'removeBuild', buildId});
-	buildId = undefined;
 };
 
-/**
- * @param {Project} proj
- * @param {ProjFile} main
- */
-export const devPlay = async (proj, main) => {
-	console.log('Playing '+main.path);
-	if (!service) throw new Error('Service worker not ready.');
-	await devStop();
-	buildId = Math.random().toString(36).substring(7);
-	const files = Object.fromEntries([...proj.files].map(f => [
-		buildId+'/'+f.path, f.content
-	]));
-	const mainUrl = `${urlBase}${buildId}/${main.path}`;
-	const platformUrl = `${urlBase}${buildId}/platform.js`;
-	await serviceCommand({ type: 'addBuild', buildId, files});
-	const processorName = 'MainProcessor' + processorId();
-	const shim = makeWorklet(mainUrl, platformUrl, processorName);
-	const shimUrl = URL.createObjectURL(new Blob([shim], {type: 'application/javascript'}));
+const playUrl = async (main, shimUrl, processorName) => {
 	const callbacks = {
 		getMainRelative(path) {
 			return main.relativeFile(path).content;
@@ -91,4 +73,34 @@ export const devPlay = async (proj, main) => {
 			Object.assign(knownParams[existingIdx], param);
 		}
 	}
+};
+
+/**
+ * @param {Project} proj
+ * @param {ProjFile} main
+ */
+export const devPlay = async (proj, main) => {
+	console.log('Playing '+main.path);
+	if (!service) throw new Error('Service worker not ready.');
+	await devStop();
+	if (buildId) await serviceCommand({type: 'removeBuild', buildId});
+	buildId = Math.random().toString(36).substring(7);
+	const files = Object.fromEntries([...proj.files].map(f => [
+		buildId+'/'+f.path, f.content
+	]));
+	const mainUrl = `${urlBase}${buildId}/${main.path}`;
+	const platformUrl = `${urlBase}${buildId}/platform.js`;
+	await serviceCommand({ type: 'addBuild', buildId, files});
+	const processorName = 'MainProcessor' + processorId();
+	const shim = makeWorklet(mainUrl, platformUrl, processorName);
+	const shimUrl = URL.createObjectURL(new Blob([shim], {type: 'application/javascript'}));
+	await playUrl(main, shimUrl, processorName);
+	lastPlayMain = main;
+	lastUrl = shimUrl;
+	lastName = processorName;
+};
+
+export const devReplay = async () => {
+	console.log('Relaying '+lastPlayMain.path);
+	await playUrl(lastPlayMain, lastUrl, lastName);
 };

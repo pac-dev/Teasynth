@@ -1,7 +1,7 @@
 import { CodeEditor } from './codeEditor.js';
 import { m } from './lib/mithrilModule.js';
 import { ProjDir, Project, ProjFile } from './shared/Project.js';
-import { initService, devPlay, devStop, knownParams, mainTrack } from './devPlayer.js';
+import { initService, devPlay, devReplay, devStop, knownParams, mainTrack, lastPlayMain } from './devPlayer.js';
 import { fsOpen, fsSave, fsSaveAs, canSave } from './fsa.js';
 import { exportTrack, zipify } from './shared/exporter.js';
 
@@ -230,7 +230,13 @@ const Tools = {
 		}, 'stop'),
 		m('.tool', {
 			onclick: exportCurrent
-		}, 'export')
+		}, 'export'),
+		m('.tool', {
+			onclick: () => {
+				devReplay();
+				editor.focus();
+			}
+		}, 'replay'),
 	]
 };
 
