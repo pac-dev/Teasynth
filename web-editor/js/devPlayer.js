@@ -58,8 +58,14 @@ export const initService = async _urlBase => {
 
 export const devStop = async dt => {
 	if (!service) throw new Error('Service worker not ready.');
-	await serviceCommand({type: 'removeBuild', buildId: dt.buildId});
-	removeTrack(dt.track, false);
+	if (dt.buildId) {
+		await serviceCommand({type: 'removeBuild', buildId: dt.buildId});
+		dt.buildId = undefined;
+	}
+	if (dt.track) {
+		removeTrack(dt.track, false);
+		dt.track = undefined;
+	}
 	dt.status = 'stopped';
 };
 
@@ -75,15 +81,14 @@ const playUrl = async dt => {
 	};
 	const initParams = Object.fromEntries(dt.params.map(p => [p.name, p.val]));
 	dt.track = await createTrack({url: dt.shimUrl, processorName: dt.processorName, callbacks, initParams});
-	for (let param of dt.track.paramSpecs) {
-		const existingIdx = dt.params.findIndex(p => p.name === param.name);
-		if (existingIdx === -1) {
-			param.val = param.def;
-			dt.params.push(param);
-		} else {
-			Object.assign(dt.params[existingIdx], param);
-		}
-	}
+	/** @type {Array.<Object>} */
+	const oldParams = dt.params;
+	dt.params = dt.track.paramSpecs.map(spec => {
+		spec.val = spec.def;
+		const old = oldParams.find(p => p.name === spec.name && p.val >= spec.min && p.val <= spec.max);
+		if (old) spec.val = old.val;
+		return spec;
+	});
 	dt.status = 'playing';
 };
 
@@ -96,15 +101,15 @@ export const devPlay = async (proj, main) => {
 	if (!service) throw new Error('Service worker not ready.');
 	const name = main.parent.path;
 	let dt = devTracks.find(t => t.name === name);
-	if (dt && dt.status === 'playing') {
+	// It seems impossible to distinguish between error state and loading state,
+	// so let's just call stop and clean up any existing resources.
+	if (dt) {
 		await devStop(dt);
-	} else if (dt && dt.status === 'loading') {
-		throw new Error('tried playing loading track: '+dt.name);
-	} else if (!dt) {
+	} else {
 		dt = { name, main, params: [], status: 'loading' };
 		devTracks.push(dt);
 	}
-	dt.buildId = Math.random().toString(36).substring(7);
+	dt.buildId = 'build'+Math.random().toString(36).substring(7);
 	const files = Object.fromEntries([...proj.files].map(f => [
 		dt.buildId+'/'+f.path, f.content
 	]));

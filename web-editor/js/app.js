@@ -251,11 +251,21 @@ const Tools = {
 const trackStopper = dt => {
 	if (dt.status === 'playing') {
 		return m('', {
-			onclick: () => devStop(dt),
+			onclick: async () => {
+				await devStop(dt);
+				m.redraw();
+			},
 			style: { display: 'inline', fontWeight: 600 }
 		}, '[stop] ');
+	} else {
+		return m('', {
+			onclick: async () => {
+				await devPlay(proj, dt.main);
+				m.redraw();
+			},
+			style: { display: 'inline', fontWeight: 600 }
+		}, '[play] ');
 	}
-	return '('+dt.status+')';
 };
 
 /** @param {import('./devPlayer.js').DevTrack} dt */

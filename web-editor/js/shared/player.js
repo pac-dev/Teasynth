@@ -22,8 +22,12 @@ export class PlayingTrack {
 			numberOfInputs: 0,
 			outputChannelCount: [2]
 		});
-		const playResult = {};
 		this.node = node;
+		node.onprocessorerror = error => {
+			console.log('got to rare processor error');
+			throw error;
+		};
+		const playResult = {};
 		this.playResult = playResult;
 		this.paramSpecs = [];
 		const rcvHostCmd = async data => {
