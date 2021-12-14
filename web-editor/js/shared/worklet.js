@@ -1,7 +1,7 @@
 
-export const makeWorklet = (mainUrl, platformUrl, processorName) => `
+export const makeWorklet = (mainUrl, hostUrl, processorName) => `
 	import * as mainModule from '${mainUrl}';
-	import { platform } from '${platformUrl}';
+	import { mainHost } from '${hostUrl}';
 
 	const runHostCmd = (port, data) => new Promise(resolve => {
 		const cmdId = Math.random().toString(36).substring(7);
@@ -43,30 +43,26 @@ export const makeWorklet = (mainUrl, platformUrl, processorName) => `
 			port.postMessage({type: 'wrong samplerate', wantRate});
 			return;
 		}
-		platform.getMainRelative = async path => {
+		mainHost.sampleRate = sampleRate;
+		mainHost.getMainRelative = async path => {
 			const resp = await runHostCmd(port, {cmd: 'getMainRelative', path});
 			return resp.content;
 		};
-		platform.compileFaust = async (code, internalMemory) => {
+		mainHost.compileFaust = async (code, internalMemory) => {
 			return await runHostCmd(port, {cmd: 'compileFaust', code, internalMemory});
 		};
-		platform.initialized = true;
+		processFrame = mainModule.process ?? await mainModule.instantiate();
+		await mainHost.init();
 		const paramSpecs = [];
-		for (let name of Object.keys(platform.params)) {
-			const param = platform.params[name];
+		for (let name of Object.keys(mainHost.params)) {
+			const param = mainHost.params[name];
 			paramSpecs.push({...param, name, setFn: false});
 			if (name in data.initParams) {
 				param.setFn(parseFloat(data.initParams[name]));
 			}
 		}
 		await runHostCmd(port, {cmd: 'defineParams', paramSpecs});
-		if (!mainModule.process) throw new Error('main.js must export a "process" function!');
-		processFrame = mainModule.process;
-		firstFrame = await processFrame();
-		if (typeof firstFrame === 'function') {
-			processFrame = firstFrame;
-			firstFrame = processFrame();
-		}
+		firstFrame = processFrame();
 		if (typeof firstFrame === 'number') {
 			frame2channels = (frame, channels, i) => {
 				channels[0][i] = frame;
@@ -84,14 +80,12 @@ export const makeWorklet = (mainUrl, platformUrl, processorName) => `
 			}
 		} else throw new Error('process returned '+firstFrame+' ('+(typeof firstFrame)+')! '
 			+'It should return a number or an array of one or two numbers! '
-			+'or, you know, a promise that returns a function that returns one of those things. '
-			+'any questions?'
 		);
 		canFill = true;
 		port.addEventListener('message', event => {
 			if (event.data.type !== 'set param') return;
-			if (!(event.data.name in platform.params)) return;
-			platform.params[event.data.name].setFn(parseFloat(event.data.val));
+			if (!(event.data.name in mainHost.params)) return;
+			mainHost.params[event.data.name].setFn(parseFloat(event.data.val));
 		});
 		port.postMessage({type: 'main ready'});
 	};

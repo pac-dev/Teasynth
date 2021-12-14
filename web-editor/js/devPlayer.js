@@ -114,10 +114,10 @@ export const devPlay = async (proj, main) => {
 		dt.buildId+'/'+f.path, f.content
 	]));
 	const mainUrl = `${urlBase}${dt.buildId}/${main.path}`;
-	const platformUrl = `${urlBase}${dt.buildId}/platform.js`;
+	const hostUrl = `${urlBase}${dt.buildId}/host.js`;
 	await serviceCommand({ type: 'addBuild', buildId: dt.buildId, files});
 	dt.processorName = 'MainProcessor' + processorId();
-	const shim = makeWorklet(mainUrl, platformUrl, dt.processorName);
+	const shim = makeWorklet(mainUrl, hostUrl, dt.processorName);
 	dt.shimUrl = URL.createObjectURL(new Blob([shim], {type: 'application/javascript'}));
 	await playUrl(dt);
 };
