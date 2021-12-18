@@ -87,6 +87,11 @@ export const makeWorklet = (mainUrl, hostUrl, processorName) => `
 			if (!(event.data.name in mainHost.params)) return;
 			mainHost.params[event.data.name].setFn(parseFloat(event.data.val));
 		});
+		port.addEventListener('message', event => {
+			if (event.data.type === 'hostResp') return;
+			if (!mainHost.events) return;
+			mainHost.events.trigger(event.data.type, event.data);
+		});
 		port.postMessage({type: 'main ready'});
 	};
 	

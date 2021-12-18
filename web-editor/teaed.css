@@ -69,7 +69,7 @@ input.renamer.renaming {
 .toplink {
 	position: relative;
 	padding: 1.3rem;
-	min-width: 4rem;
+	min-width: 3rem;
 	text-align: center;
 	touch-action: none;
 	user-select: none;

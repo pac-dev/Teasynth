@@ -68,7 +68,7 @@ export const exportTrack = async (proj, main, esbuild_in) => {
 		});
 	}
 	const trackName = 'worklet_' + main.parent.name;
-	const worklet = makeWorklet('./'+main.path, './platform.js', trackName);
+	const worklet = makeWorklet('./'+main.path, './host.js', trackName);
 	console.log(`esbuild: bundling ${main.parent.path}...`);
 	const result = await esbuild.build({
 		bundle: true,

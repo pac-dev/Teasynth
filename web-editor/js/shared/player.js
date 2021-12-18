@@ -63,9 +63,8 @@ export class PlayingTrack {
 			node.port.postMessage({type: 'init main', initParams: this.initParams});
 		});
 	}
-	setParam(name, val) {
-		this.node.port.postMessage({type: 'set param', name, val});
-	}
+	postMessage(msg) { this.node.port.postMessage(msg); }
+	setParam(name, val) { this.postMessage({type: 'set param', name, val}); }
 	stop() {
 		// this.node.disconnect();
 		this.audioContext.close();

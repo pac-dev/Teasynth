@@ -20,6 +20,7 @@ let service;
 
 /** @type {Array.<DevTrack>} */
 export const devTracks = [];
+window.devTracks = devTracks;
 
 const processorId = (() => {
 	let count = 1;
