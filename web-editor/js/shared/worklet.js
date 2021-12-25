@@ -44,8 +44,8 @@ export const makeWorklet = (mainUrl, hostUrl, processorName) => `
 			return;
 		}
 		mainHost.sampleRate = sampleRate;
-		mainHost.getMainRelative = async path => {
-			const resp = await runHostCmd(port, {cmd: 'getMainRelative', path});
+		mainHost.fetchMainRelative = async path => {
+			const resp = await runHostCmd(port, {cmd: 'fetchMainRelative', path});
 			return resp.content;
 		};
 		mainHost.compileFaust = async (code, internalMemory) => {
@@ -105,10 +105,14 @@ export const makeWorklet = (mainUrl, hostUrl, processorName) => `
 			}
 		}
 		process(inputs, outputs, parameters) {
+			// performance.now is not available in worklets.
+			const t0 = Date.now();
 			const channels = outputs[0];
 			for (let i=0; i<channels[0].length; i++) {
 				fillChannels(channels, i);
 			}
+			const t1 = Date.now();
+			mainHost.processTime = t1 - t0;
 			return true;
 		}
 	}

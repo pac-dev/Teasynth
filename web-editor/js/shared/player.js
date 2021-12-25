@@ -32,8 +32,8 @@ export class PlayingTrack {
 		this.paramSpecs = [];
 		const rcvHostCmd = async data => {
 			const resp = {type: 'hostResp', cmdId: data.cmdId};
-			if (data.cmd === 'getMainRelative') {
-				resp.content = await this.callbacks.getMainRelative(data.path);
+			if (data.cmd === 'fetchMainRelative') {
+				resp.content = await this.callbacks.fetchMainRelative(data.path);
 			} else if (data.cmd === 'compileFaust') {
 				const ret = await this.callbacks.compileFaust(data.code, data.internalMemory);
 				[resp.ui8Code, resp.dspMeta] = ret;

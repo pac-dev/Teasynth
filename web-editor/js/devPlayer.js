@@ -72,7 +72,7 @@ export const devStop = async dt => {
 
 const playUrl = async dt => {
 	const callbacks = {
-		getMainRelative(path) {
+		fetchMainRelative(path) {
 			return dt.main.relativeFile(path).content;
 		},
 		async compileFaust(code, internalMemory) {
