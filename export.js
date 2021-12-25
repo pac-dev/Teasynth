@@ -1,12 +1,13 @@
 import { exportTrack } from './web-editor/js/shared/exporter.js';
 import { Project, ProjFile, ProjDir } from './web-editor/js/shared/Project.js';
-import * as esbuild from "https://deno.land/x/esbuild@v0.13.8/mod.js";
+import * as esbuild from 'https://deno.land/x/esbuild@v0.13.8/mod.js';
+import { parse } from 'https://deno.land/std@0.118.0/flags/mod.ts';
 
 const helpText = `
 Teagen exporter.
 
 Usage:
-deno run -A export.js PROJ OUT
+deno run -A export.js [--faust-out DIR] [-t track1] [-t track2]... PROJ OUT
 
 Export tracks from the given Teagen project (PROJ) into the OUT folder. Each
 track's main.js is bundled into an AudioWorklet JS file. Faust sources are
@@ -21,9 +22,13 @@ const helpAndExit = () => {
 	Deno.exit();
 };
 
-if (Deno.args.length !== 2) helpAndExit();
+const args = parse(Deno.args);
 
-const outDir = Deno.args[1].replace(/k$/, '') + '/';
+if (args._.length !== 2) helpAndExit();
+
+const outDir = args._[1] + '/';
+const wantTracks = ('t' in args) ? [].concat(args['t']) : [];
+const faustOut = args['faust-out'] ? args['faust-out'] + '/' : undefined;
 Deno.mkdirSync(outDir, {recursive: true});
 
 const proj = new Project('workspace');
@@ -47,19 +52,24 @@ const walkFs = (fsPath, projDir) => {
 	}
 };
 console.log('reading input project...');
-walkFs(Deno.args[0], proj.root);
-
+walkFs(args._[0], proj.root);
 for (let main of proj.files) {
 	if (main.name !== 'main.js') continue;
 	if (main.path.includes('failed')) continue;
 	const exFiles = await exportTrack(proj, main, esbuild);
-	const tPath = outDir+main.parent.path;
-	Deno.mkdirSync(tPath, {recursive: true});
+	const tPath = outDir+main.parent.path+'/';
+	if (!wantTracks.length || wantTracks.includes(main.parent.name)) {
+		Deno.mkdirSync(tPath, {recursive: true});
+	}
 	for (let filename of Object.keys(exFiles)) {
+		if (wantTracks.length && filename.endsWith('.js') && !wantTracks.includes(main.parent.name)) {
+			continue;
+		}
+		const path = (faustOut && filename.match(/(\.wasm|\.json)$/)) ? faustOut : tPath;
 		if (typeof exFiles[filename] === 'string') {
-			Deno.writeTextFileSync(tPath+'/'+filename, exFiles[filename])
+			Deno.writeTextFileSync(path+filename, exFiles[filename])
 		} else {
-			Deno.writeFileSync(tPath+'/'+filename, exFiles[filename])
+			Deno.writeFileSync(path+filename, exFiles[filename])
 		}
 	}
 }
