@@ -1,4 +1,4 @@
-import { exportTrack } from './web-editor/js/shared/exporter.js';
+import { exportTrack } from '../web-editor/js/shared/exporter.js';
 import { Project, ProjFile, ProjDir } from './web-editor/js/shared/Project.js';
 import * as esbuild from 'https://deno.land/x/esbuild@v0.13.8/mod.js';
 import { parse } from 'https://deno.land/std@0.118.0/flags/mod.ts';
