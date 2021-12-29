@@ -2,7 +2,7 @@ import { parse } from 'https://deno.land/std@0.118.0/flags/mod.ts';
 import { loadTrack, parseParamArgs, createRenderer } from './renderlib.js';
 
 const helpText = `
-Teagen renderer.
+Teasynth renderer.
 
 Usage:
 deno run -A render.js [-t DURATION] [-p-PARAM X ...] path/to/main.js out.wav

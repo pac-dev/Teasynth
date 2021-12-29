@@ -32,8 +32,8 @@ addEventListener('message', event => {
 });
 
 self.addEventListener('fetch', e => {
-	// e.request.url eg: http://localhost/tg/udxq1q/main.js
-	// registration.scope eg: http://localhost/tg/
+	// e.request.url: https://example.com/teasynth/udxq1q/main.js
+	// registration.scope: https://example.com/teasynth/
 	const path = e.request.url.substring(self.registration.scope.length);
 	for (const files of Object.values(self.builds)) {
 		if (files[path] === undefined) continue;

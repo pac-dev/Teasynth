@@ -1,15 +1,15 @@
 import { exportTrack } from '../web-editor/js/shared/exporter.js';
-import { Project, ProjFile, ProjDir } from './web-editor/js/shared/Project.js';
+import { Project, ProjFile, ProjDir } from '../web-editor/js/shared/Project.js';
 import * as esbuild from 'https://deno.land/x/esbuild@v0.13.8/mod.js';
 import { parse } from 'https://deno.land/std@0.118.0/flags/mod.ts';
 
 const helpText = `
-Teagen exporter.
+Teasynth exporter.
 
 Usage:
 deno run -A export.js [--faust-out DIR] [-t track1] [-t track2]... PROJ OUT
 
-Export tracks from the given Teagen project (PROJ) into the OUT folder. Each
+Export tracks from the given Teasynth project (PROJ) into the OUT folder. Each
 track's main.js is bundled into an AudioWorklet JS file. Faust sources are
 precompiled into wasm+json files in the export folder.
 
