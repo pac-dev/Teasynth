@@ -14,6 +14,7 @@ const createModel = f => {
 	else if (f.path.endsWith('.sp')) lang = 'sporth';
 	else if (f.path.endsWith('.dsp')) lang = 'faust';
 	const model = monaco.editor.createModel(f.content, lang, uri);
+	model.updateOptions({ insertSpaces: false });
 	model.setEOL(monaco.editor.EndOfLineSequence.LF);
 	model.onDidChangeContent(() => {
 		f.content = model.getValue();
