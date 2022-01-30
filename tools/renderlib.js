@@ -37,6 +37,7 @@ export const loadTrack = async mainPath => {
 				hostMod.mainHost.params[name].setFn(parseFloat(val));
 			}
 		},
+		host: hostMod.mainHost,
 		process
 	};
 };
@@ -90,6 +91,10 @@ export const createRenderer = track => {
 					} else {
 						await p.stdin.write(buf);
 					}
+				}
+				if (track.host.wantInterrupt) {
+					delete track.host.wantInterrupt;
+					break;
 				}
 			}
 		},

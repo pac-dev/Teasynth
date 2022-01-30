@@ -14,13 +14,17 @@ const helpAndExit = () => {
 const args = parse(Deno.args);
 if (args._.length !== 2) helpAndExit();
 const outBase = args._[1];
-const inDur = args.intro ?? 6;
-const loopDur = args.loop ?? 18;
+let inDur = args.intro ?? 6;
+let loopDur = args.loop ?? 18;
 const xfDur = args.xf ?? 2;
 
 const track = await loadTrack('./'+args._[0]);
 track.setParams(parseParamArgs(args));
 const r = createRenderer(track);
+if (track.host.willInterupt) {
+	inDur = 666;
+	loopDur = 666;
+}
 
 console.log('rendering...');
 const inPipe = await r.addOutput(outBase+'_intro.ogg');
