@@ -1,5 +1,4 @@
-import { resolve, toFileUrl } from 'https://deno.land/std/path/mod.ts';
-import { existsSync } from 'https://deno.land/std/fs/mod.ts';
+import { resolve, toFileUrl, existsSync } from './deps.js';
 import { compileFaust } from '../web-editor/js/shared/faustCompiler.js';
 
 const findHostPath = startPath => {
