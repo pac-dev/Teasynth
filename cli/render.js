@@ -1,5 +1,5 @@
 import { resolve, toFileUrl, existsSync } from './deps.js';
-import { compileFaust } from '../web-editor/js/shared/faustCompiler.js';
+import { compileFaust } from '../core/faustCompiler.js';
 
 const findHostPath = startPath => {
 	while(startPath.length > 2) {

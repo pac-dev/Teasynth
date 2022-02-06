@@ -7,7 +7,7 @@ const cmd = txt => cyan(bold(txt));
 const helpText = `
 Teasynth command line.
 If installed, invoke with: ${cmd('teasynth')}
-Otherwise, use: ${cmd('deno run -A teasynth.js')}
+Otherwise, use: ${cmd('deno run -A --unstable teasynth.js')}
 
 Subcommands:
 
@@ -45,12 +45,14 @@ const commandActions = {
 		build({ inDir, outDir, wantTracks, faustOut });
 	},
 	'serve-editor': async () => {
-		const base = Deno.cwd() + '/web-editor';
+		const cd = Deno.cwd();
 		const handler = async req => {
 			const reqPath = new URL(req.url).pathname;
 			let fsPath;
-			if (reqPath === '/') fsPath = base + '/index.html';
-			else fsPath = base + reqPath;
+			if (reqPath.startsWith('/editor-js')) fsPath = cd + reqPath;
+			else if (reqPath.startsWith('/core')) fsPath = cd + reqPath;
+			else if (reqPath === '/') fsPath = cd + '/editor-static/index.html';
+			else fsPath = cd + '/editor-static' + reqPath;
 			if (existsSync(fsPath)) {
 				const response = await serveFile(req, fsPath);
 				return response;

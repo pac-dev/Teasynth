@@ -1,6 +1,6 @@
-import { compileFaust } from '../web-editor/js/shared/faustCompiler.js';
-import { Project, ProjFile, ProjDir } from '../web-editor/js/shared/Project.js';
-import { makeWorklet } from '../web-editor/js/shared/worklet.js';
+import { compileFaust } from '../core/faustCompiler.js';
+import { Project, ProjFile, ProjDir } from '../core/project.js';
+import { makeWorklet } from '../core/worklet.js';
 
 const cyrb53 = (str, seed = 0) => {
 	let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed;
