@@ -4,8 +4,8 @@ import { ProjDir, Project, ProjFile } from '../core/project.js';
 import { initService, devPlay, devStop, devTracks } from './devPlayer.js';
 import { fsOpen, fsSave, fsSaveAs, canSave } from './fsa.js';
 
-let proj = new Project('Untitled Project');
-proj.root.addChild(new ProjFile('main.js', "console.log('running in bread')"));
+let proj = new Project('Empty project');
+proj.root.addChild(new ProjFile('main.js', ''));
 let editingFile = proj.getDefaultMain();
 let lastMain = editingFile;
 const playCurrent = async () => {
@@ -24,8 +24,16 @@ const stopAll = async () => {
 	m.redraw();
 };
 const editor = new CodeEditor(proj, editingFile.id);
-window.getProj = () => proj;
+window.getProject = () => proj;
 window.getEditor = () => editor;
+window.exportProject = async () => {
+	const projStr = JSON.stringify(proj.toJsonObj());
+	const fileURL = URL.createObjectURL(new Blob([projStr]));
+	const a = document.createElement('A');
+	a.href = fileURL;
+	a.download = 'project.json';
+	a.click();
+};
 editor.addShortcut('Alt+KEY_1', 'Play', () => playCurrent());
 editor.addShortcut('Alt+KEY_2', 'Stop', () => stopAll());
 editor.addShortcut('Alt+KEY_3', 'Previous File', () => {
@@ -44,6 +52,22 @@ editor.addShortcut('Alt+KEY_4', 'Next File', () => {
 	editingFile = files[(currentIdx+1)%files.length];
 	m.redraw();
 });
+const loadJson = async () => {
+	let url = location.href;
+	if (!url.endsWith('/')) url += '/';
+	url += 'project.json';
+	let obj, resp = await fetch(url);
+	try { obj = await resp.json(); }
+	catch (error) { return alert('Project not found.'); }
+	proj = Project.fromJsonObj(obj);
+	await editor.loaded;
+	editor.setProject(proj);
+	editingFile = proj.getDefaultMain();
+	proj.root.collapseDescendants();
+	m.redraw();
+	editor.focus();
+};
+loadJson();
 const origin = new URL(location.href).origin;
 const monacoUrl = origin + '/editor-js/lib/monaco/min';
 initService(origin + '/'); // async
@@ -140,7 +164,7 @@ const makeFileItem = f => m(
 		makeRenamer({
 			getValue: () => f.path,
 			setValue: v => {
-				proj.changeFilePath(f, v);
+				proj.setFilePath(f, v);
 				window.setTimeout(() => {
 					editor.updateFiles();
 					editor.focus();

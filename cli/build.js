@@ -34,6 +34,18 @@ const walkFs = (fsPath, projDir) => {
 };
 
 /**
+ * @param {string} path 
+ * @returns Project
+ */
+export const path2proj = path => {
+	if (path.endsWith('/')) path = path.slice(0, -1);
+	const name = path.split('/').pop();
+	const ret = new Project(name);
+	walkFs(path, ret.root);
+	return ret;
+};
+
+/**
  * @param {Project} proj 
  * @param {ProjFile} main 
  */
@@ -66,9 +78,8 @@ const buildTrack = async (proj, main) => {
 
 export const build = async ({ inDir, outDir, wantTracks, faustOut }) => {
 	Deno.mkdirSync(outDir, {recursive: true});
-	const proj = new Project('workspace');
 	console.log('reading input project...');
-	walkFs(inDir, proj.root);
+	const proj = path2proj(inDir);
 	for (let main of proj.files) {
 		if (main.name !== 'main.js') continue;
 		if (main.path.includes('failed')) continue;

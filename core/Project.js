@@ -165,7 +165,7 @@ export class Project {
 	 * @param {ProjFile} file
 	 * @param {String} path
 	 */
-	changeFilePath(file, path) {
+	setFilePath(file, path) {
 		const components = path.split('/');
 		file.name = components.pop();
 		let parent = this.root;
@@ -179,7 +179,7 @@ export class Project {
 				throw new Error(`Tried adding ${path}, but it clobbers non-directory ${parent.path}!`)
 			}
 		}
-		file.remove();
+		if (file.parent) file.remove();
 		parent.addChild(file);
 		return file;
 	}
@@ -218,5 +218,21 @@ export class Project {
 			if (f === file) return true;
 		}
 		return false;
+	}
+	toJsonObj() {
+		const ret = { name: this.name, files: {} };
+		for (let file of this.files) {
+			if (file.isDir) continue;
+			ret.files[file.path] = file.content;
+		}
+		return ret;
+	}
+	static fromJsonObj(obj) {
+		const ret = new Project(obj.name);
+		for (let [path, content] of Object.entries(obj.files)) {
+			const file = new ProjFile('', content);
+			ret.setFilePath(file, path);
+		}
+		return ret;
 	}
 }

@@ -1,4 +1,4 @@
-import { Project, ProjFile, ProjDir } from '../core/Project.js';
+import { Project, ProjFile, ProjDir } from '../core/project.js';
 
 let currentDirHandle;
 

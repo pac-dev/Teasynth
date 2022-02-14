@@ -1,18 +1,18 @@
-import { resolve, toFileUrl, existsSync } from './deps.js';
+import { resolve, toFileUrl, exists } from './deps.js';
 import { compileFaust } from '../core/faustCompiler.js';
 
-const findHostPath = startPath => {
+const findHostPath = async startPath => {
 	while(startPath.length > 2) {
 		// remove last component of path
 		startPath = startPath.replace(/\/([^\/]+)$/, '');
-		if (existsSync(startPath+'/host.js')) {
+		if (await exists(startPath+'/host.js')) {
 			return startPath+'/host.js';
 		}
 	}
 };
 
 export const loadTrack = async mainPath => {
-	const hostPath = findHostPath(mainPath);
+	const hostPath = await findHostPath(mainPath);
 	if (!hostPath) throw new Error('could not find host.js');
 	const hostMod = await import(toFileUrl(resolve(hostPath)).href);
 	const mainMod = await import(toFileUrl(resolve(mainPath)).href+'?id='+(Math.random().toString(36).substring(7)));

@@ -1,6 +1,7 @@
-import { parse, bold, cyan, serve, serveFile, existsSync } from './cli/deps.js';
+import { parse, bold, cyan, dirname } from './cli/deps.js';
 import { loadTrack, parseParamArgs, createRenderer } from './cli/render.js';
 import { build } from './cli/build.js';
+import { readConfig, serveEditor, generateEditor } from './cli/editor.js';
 
 const cmd = txt => cyan(bold(txt));
 
@@ -17,6 +18,8 @@ Subcommands:
     Usage: ${cmd('teasynth build PROJDIR OUTDIR [--track NAME]')}
   ${cmd('serve-editor')}: Serve the Teasynth web editor locally.
     Usage: ${cmd('teasynth serve-editor [--config FILE]')}
+  ${cmd('generate-editor')}: Generate the Teasynth editor static website for deployment.
+    Usage: ${cmd('teasynth generate-editor OUTDIR [--config FILE] [-y]')}
 `;
 
 const helpAndExit = () => {
@@ -44,24 +47,19 @@ const commandActions = {
 		const inDir = args._[1];
 		build({ inDir, outDir, wantTracks, faustOut });
 	},
-	'serve-editor': async () => {
-		const cd = Deno.cwd();
-		const handler = async req => {
-			const reqPath = new URL(req.url).pathname;
-			let fsPath;
-			if (reqPath.startsWith('/editor-js')) fsPath = cd + reqPath;
-			else if (reqPath.startsWith('/core')) fsPath = cd + reqPath;
-			else if (reqPath === '/') fsPath = cd + '/editor-static/index.html';
-			else fsPath = cd + '/editor-static' + reqPath;
-			if (existsSync(fsPath)) {
-				const response = await serveFile(req, fsPath);
-				return response;
-			} else {
-				return new Response('404: Not Found', { status: 404 });
-			}
-		};
-		console.log('http://localhost:8000/');
-		serve(handler, { port: 8000 });
+	'serve-editor': async args => {
+		console.log('Important: serve-editor is not suitable for public-facing servers!');
+		console.log('Use generate-editor for publishing.');
+		const teaDir = dirname(new URL(import.meta.url).pathname);
+		const config = await readConfig(args, teaDir);
+		serveEditor(config, teaDir);
+	},
+	'generate-editor': async args => {
+		console.log('Static host must be configured to serve /index.html as 404 page.');
+		const teaDir = dirname(new URL(import.meta.url).pathname);
+		const config = await readConfig(args, teaDir);
+		const outDir = args._[1];
+		await generateEditor(config, teaDir, outDir, args.y);
 	}
 };
 

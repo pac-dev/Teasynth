@@ -31,6 +31,10 @@ export class CodeEditor {
 		this.currentFileId = currentFileId;
 		this.shortcuts = [];
 		this.setProject(proj);
+		const that = this;
+		this.loaded = new Promise(resolve => {
+			that.onLoaded = resolve;
+		});
 	}
 	/** @param {Project} proj */
 	setProject(proj) {
@@ -149,6 +153,7 @@ export class CodeEditor {
 			this.ready = true;
 			this.updateFiles();
 			this.shortcuts.forEach(s => this.loadedAddShortcut(...s));
+			this.onLoaded();
 		});
 	}
 }
