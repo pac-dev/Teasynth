@@ -52,6 +52,14 @@ editor.addShortcut('Alt+KEY_4', 'Next File', () => {
 	editingFile = files[(currentIdx+1)%files.length];
 	m.redraw();
 });
+const setProject = proj => {
+	editor.setProject(proj);
+	editingFile = proj.getDefaultMain();
+	proj.root.collapseDescendants();
+	editingFile.openAncestors();
+	m.redraw();
+	editor.focus();
+};
 const loadJson = async () => {
 	let url = location.href;
 	if (!url.endsWith('/')) url += '/';
@@ -61,11 +69,7 @@ const loadJson = async () => {
 	catch (error) { return alert('Project not found.'); }
 	proj = Project.fromJsonObj(obj);
 	await editor.loaded;
-	editor.setProject(proj);
-	editingFile = proj.getDefaultMain();
-	proj.root.collapseDescendants();
-	m.redraw();
-	editor.focus();
+	setProject(proj);
 };
 loadJson();
 const origin = new URL(location.href).origin;
@@ -153,7 +157,11 @@ const makeFileItem = f => m(
 		...decorators(f),
 		m('.path', {
 			onclick: () => {
-				if (!f.isDir) editingFile = f;
+				if (f.isDir) {
+					f.collapsed = !f.collapsed;
+				} else {
+					editingFile = f;
+				}
 				editor.focus();
 			},
 			ondblclick: () => {
@@ -208,11 +216,7 @@ const TopLinks = {
 		m('.toplink', {
 			onclick: async () => {
 				proj = await fsOpen();
-				editor.setProject(proj);
-				editingFile = proj.getDefaultMain();
-				proj.root.collapseDescendants();
-				m.redraw();
-				editor.focus();
+				setProject(proj);
 			}
 		}, 'load'),
 		m(canSave() ? '.toplink' : '.toplink.disabled', {

@@ -49,6 +49,11 @@ export class ProjFile {
 			if (ret) return ret;
 		}
 	}
+	openAncestors() {
+		this.lineage.forEach(dir => {
+			dir.collapsed = false;
+		});
+	}
 	relativeFile(relPath) {
 		const components = relPath.split('/');
 		const tgtName = components.pop();
