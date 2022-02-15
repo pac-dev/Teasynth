@@ -273,9 +273,24 @@ const trackStopper = dt => {
 };
 
 /** @param {import('./devPlayer.js').DevTrack} dt */
+const trackClearer = dt => {
+	if (dt.params.length) {
+		return [m('', {
+			onclick: () => { dt.params.length = 0; },
+			style: { display: 'inline', fontWeight: 600 }
+		}, '[clear] ')];
+	} else {
+		return [];
+	}
+};
+
+/** @param {import('./devPlayer.js').DevTrack} dt */
 const ParamsTrack = dt => [
 	m('.params_title', [
-		dt.name+' ', trackStopper(dt)
+		dt.name,
+		m('br'),
+		trackStopper(dt),
+		...trackClearer(dt),
 	]),
 	...dt.params.map(par =>
 		m('.param', [
