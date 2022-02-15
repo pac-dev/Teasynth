@@ -52,6 +52,13 @@ export class CodeEditor {
 	updateFiles() {
 		const projFiles = [...this.proj.files].filter(f => !f.isDir);
 		const projIds = projFiles.map(f => f.id);
+		for (const id of Object.keys(this.fileModels)) {
+			if (!projIds.includes(id)) {
+				this.fileModels[id].dispose();
+				delete this.fileModels[id];
+				delete this.fileStates[id];
+			}
+		}
 		for (let file of projFiles) {
 			const oldModel = this.fileModels[file.id];
 			if (oldModel) {
@@ -65,13 +72,6 @@ export class CodeEditor {
 				}
 			} else {
 				this.fileModels[file.id] = createModel(file);
-			}
-		}
-		for (const id of Object.keys(this.fileModels)) {
-			if (!projIds.includes(id)) {
-				this.fileModels[id].dispose();
-				delete this.fileModels[id];
-				delete this.fileStates[id];
 			}
 		}
 		if (!this.editor.getModel() || this.editor.getModel() !== this.fileModels[this.currentFileId]) {
