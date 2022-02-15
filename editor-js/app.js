@@ -52,24 +52,40 @@ editor.addShortcut('Alt+KEY_4', 'Next File', () => {
 	editingFile = files[(currentIdx+1)%files.length];
 	m.redraw();
 });
-const setProject = proj => {
-	editor.setProject(proj);
-	editingFile = proj.getDefaultMain();
-	proj.root.collapseDescendants();
+const goToFilePath = path => {
+	const file = proj.findByPath(path);
+	if (!file) return false;
+	if (file.isDir) {
+		const main = file.findChild('main.js');
+		if (main) editingFile = main;
+		else return false;
+	} else {
+		editingFile = file;
+	}
 	editingFile.openAncestors();
 	m.redraw();
 	editor.focus();
+	return true;
+};
+window.addEventListener('hashchange', () => {
+	goToFilePath(location.hash.replace('#', ''));
+});
+/** @param {Project} proj */
+const setProject = (proj, filePath = '') => {
+	editor.setProject(proj);
+	proj.root.collapseDescendants();
+	if (!goToFilePath(filePath)) goToFilePath(proj.getDefaultMain().path);
 };
 const loadJson = async () => {
-	let url = location.href;
-	if (!url.endsWith('/')) url += '/';
-	url += 'project.json';
-	let obj, resp = await fetch(url);
+	let projPath = location.pathname;
+	if (!projPath.endsWith('/')) projPath += '/';
+	projPath += 'project.json';
+	let obj, resp = await fetch(projPath);
 	try { obj = await resp.json(); }
 	catch (error) { return alert('Project not found.'); }
 	proj = Project.fromJsonObj(obj);
 	await editor.loaded;
-	setProject(proj);
+	setProject(proj, location.hash.replace('#', ''));
 };
 loadJson();
 const origin = new URL(location.href).origin;

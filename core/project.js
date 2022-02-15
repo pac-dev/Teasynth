@@ -200,7 +200,7 @@ export class Project {
 		for (let comp of components) {
 			if (!comp.length) continue;
 			pos = pos.findChild(comp);
-			if (!pos) throw new Error('Search for missing path: '+path);
+			if (!pos) return;
 		}
 		return pos;
 	}
