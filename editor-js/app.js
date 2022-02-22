@@ -67,8 +67,39 @@ const goToFilePath = path => {
 	editor.focus();
 	return true;
 };
+
+// eg: #soprano?freq1=100*3/2&freq2=100*5/2
+const parseUrlFragment = () => {
+	const frag = location.hash.replace('#', '');
+	const [filePath, paramsStr] = frag.split('?');
+	const ret = { filePath, params: [] };
+	if (paramsStr) ret.params = paramsStr.split('&').map(str => {
+		let [name, val] = str.split('=');
+		val = Function(`"use strict"; return parseFloat(${val})`)();
+		return { name, val };
+	});
+	return ret;
+};
+const applyUrlFragment = parsedFragment => {
+	goToFilePath(parsedFragment.filePath);
+	const main = editingFile.closestMain;
+	const trackName = main.parent.name;
+	let dt = devTracks.find(t => t.name === trackName);
+	if (!dt) {
+		dt = { main, name: trackName, params: [], status: 'stopped' };
+		devTracks.push(dt);
+	}
+	for (let { name, val } of parsedFragment.params) {
+		const old = dt.params.find(p => p.name === name);
+		if (old && (val < old.min || val > old.max)) alert('URL param out of range: ' + name);
+		else if (old) old.val = val;
+		else dt.params.push({ name, val, min: Number.MIN_VALUE, max: Number.MAX_VALUE });
+	}
+};
 window.addEventListener('hashchange', () => {
-	goToFilePath(location.hash.replace('#', ''));
+	applyUrlFragment(parseUrlFragment());
+	m.redraw();
+	editor.focus();
 });
 /** @param {Project} proj */
 const setProject = (proj, filePath = '') => {
@@ -85,7 +116,9 @@ const loadJson = async () => {
 	catch (error) { return alert('Project not found.'); }
 	proj = Project.fromJsonObj(obj);
 	await editor.loaded;
-	setProject(proj, location.hash.replace('#', ''));
+	const parsedFragment = parseUrlFragment();
+	setProject(proj, parsedFragment.filePath);
+	applyUrlFragment(parsedFragment);
 };
 loadJson();
 const origin = new URL(location.href).origin;
@@ -301,6 +334,24 @@ const trackClearer = dt => {
 };
 
 /** @param {import('./devPlayer.js').DevTrack} dt */
+const paramSlider = (dt, par) => {
+	if (par.min !== Number.MIN_VALUE && par.max !== Number.MAX_VALUE) {
+		return [m('input[type="range"]', {
+			min: par.min,
+			max: par.max,
+			step: (par.max - par.min)/1000,
+			value: par.val,
+			oninput(e) { 
+				par.val = e.target.value;
+				if (dt.status === 'playing') dt.track.setParam(par.name, par.val);
+			}
+		})];
+	} else {
+		return [];
+	}
+};
+
+/** @param {import('./devPlayer.js').DevTrack} dt */
 const ParamsTrack = dt => [
 	m('.params_title', [
 		dt.name,
@@ -317,16 +368,7 @@ const ParamsTrack = dt => [
 				}, '[x] '),
 				` ${par.name}: ${Math.round(par.val*1000)/1000}`,
 			]),
-			m('input[type="range"]', {
-				min: par.min,
-				max: par.max,
-				step: (par.max - par.min)/1000,
-				value: par.val,
-				oninput(e) { 
-					par.val = e.target.value;
-					if (dt.status === 'playing') dt.track.setParam(par.name, par.val);
-				}
-			}),
+			...paramSlider(dt, par)
 		])
 	)
 ];
