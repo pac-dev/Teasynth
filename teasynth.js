@@ -1,4 +1,4 @@
-import { parse, bold, cyan, dirname } from './cli/deps.js';
+import { parse, bold, cyan, path } from './cli/deps.js';
 import { loadTrack, parseParamArgs, createRenderer } from './cli/render.js';
 import { build } from './cli/build.js';
 import { readConfig, serveEditor, generateEditor } from './cli/editor.js';
@@ -50,13 +50,13 @@ const commandActions = {
 	'serve-editor': async args => {
 		console.log('Important: serve-editor is not suitable for public-facing servers!');
 		console.log('Use generate-editor for publishing.');
-		const teaDir = dirname(new URL(import.meta.url).pathname);
+		const teaDir = path.dirname(path.fromFileUrl(import.meta.url));
 		const config = await readConfig(args, teaDir);
 		serveEditor(config, teaDir);
 	},
 	'generate-editor': async args => {
 		console.log('Static host must be configured to serve /index.html as 404 page.');
-		const teaDir = dirname(new URL(import.meta.url).pathname);
+		const teaDir = path.dirname(path.fromFileUrl(import.meta.url));
 		const config = await readConfig(args, teaDir);
 		const outDir = args._[1];
 		await generateEditor(config, teaDir, outDir, args.y);
@@ -69,3 +69,5 @@ if (import.meta.main) {
 	if (action) action(args);
 	else helpAndExit();
 }
+
+export { loadTrack, parseParamArgs, createRenderer, build };

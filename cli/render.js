@@ -1,24 +1,29 @@
-import { resolve, toFileUrl, exists } from './deps.js';
+import { path, exists } from './deps.js';
 import { compileFaust } from '../core/faustCompiler.js';
 
 const findHostPath = async startPath => {
-	while(startPath.length > 2) {
-		// remove last component of path
-		startPath = startPath.replace(/\/([^\/]+)$/, '');
-		if (await exists(startPath+'/host.js')) {
-			return startPath+'/host.js';
+	while(startPath.length > 1) {
+		startPath = path.dirname(startPath);
+		if (await exists(path.join(startPath, 'host.js'))) {
+			return path.join(startPath, 'host.js');
 		}
 	}
+};
+
+const importFile = async (filePath, bustCache) => {
+	filePath = path.toFileUrl(path.resolve(filePath)).href;
+	if (bustCache) filePath +='?id='+(Math.random().toString(36).substring(7));
+	return await import(filePath);
 };
 
 export const loadTrack = async mainPath => {
 	const hostPath = await findHostPath(mainPath);
 	if (!hostPath) throw new Error('could not find host.js');
-	const hostMod = await import(toFileUrl(resolve(hostPath)).href);
-	const mainMod = await import(toFileUrl(resolve(mainPath)).href+'?id='+(Math.random().toString(36).substring(7)));
-	hostMod.mainHost.fetchMainRelative = async path => {
-		path = mainPath.replace(/\/([^\/]+)$/, '')+'/'+path;
-		return await Deno.readTextFile(path);
+	const hostMod = await importFile(hostPath);
+	const mainMod = await importFile(mainPath, true);
+	hostMod.mainHost.fetchMainRelative = async fetchPath => {
+		fetchPath = path.join(mainPath, '..', fetchPath);
+		return await Deno.readTextFile(fetchPath);
 	};
 	hostMod.mainHost.compileFaust = async (code, internalMemory) => {
 		const comp = await compileFaust(code, internalMemory);

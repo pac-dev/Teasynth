@@ -1,3 +1,4 @@
+import { path } from './deps.js';
 import { compileFaust } from '../core/faustCompiler.js';
 import { Project, ProjFile, ProjDir } from '../core/project.js';
 import { makeWorklet } from '../core/worklet.js';
@@ -20,7 +21,7 @@ const cyrb53 = (str, seed = 0) => {
  */
 const walkFs = (fsPath, projDir) => {
 	for (const dirEntry of Deno.readDirSync(fsPath)) {
-		const entryPath = `${fsPath}/${dirEntry.name}`;
+		const entryPath = path.join(fsPath, dirEntry.name);
 		let projChild;
 		if (dirEntry.isDirectory) {
 			projChild = new ProjDir(dirEntry.name);
@@ -34,14 +35,13 @@ const walkFs = (fsPath, projDir) => {
 };
 
 /**
- * @param {string} path 
+ * @param {string} projPath 
  * @returns Project
  */
-export const path2proj = path => {
-	if (path.endsWith('/')) path = path.slice(0, -1);
-	const name = path.split('/').pop();
+export const path2proj = projPath => {
+	const name = path.basename(projPath);
 	const ret = new Project(name);
-	walkFs(path, ret.root);
+	walkFs(projPath, ret.root);
 	return ret;
 };
 
@@ -76,7 +76,7 @@ const buildTrack = async (proj, main) => {
 	return outFiles;
 };
 
-export const build = async ({ inDir, outDir, wantTracks, faustOut }) => {
+export const build = async ({ inDir, outDir, faustOut, wantTracks = [] }) => {
 	Deno.mkdirSync(outDir, {recursive: true});
 	console.log('reading input project...');
 	const proj = path2proj(inDir);
@@ -85,7 +85,7 @@ export const build = async ({ inDir, outDir, wantTracks, faustOut }) => {
 		if (main.path.includes('failed')) continue;
 		const exFiles = await buildTrack(proj, main);
 
-		const tPath = outDir+main.parent.path+'/';
+		const tPath = path.join(outDir, main.parent.path);
 		if (!wantTracks.length || wantTracks.includes(main.parent.name)) {
 			Deno.mkdirSync(tPath, {recursive: true});
 		}
@@ -93,11 +93,12 @@ export const build = async ({ inDir, outDir, wantTracks, faustOut }) => {
 			if (wantTracks.length && filename.endsWith('.js') && !wantTracks.includes(main.parent.name)) {
 				continue;
 			}
-			const path = (faustOut && filename.match(/(\.wasm|\.json)$/)) ? faustOut : tPath;
+			let outPath = (faustOut && filename.match(/(\.wasm|\.json)$/)) ? faustOut : tPath;
+			outPath = path.join(outPath, filename);
 			if (typeof exFiles[filename] === 'string') {
-				Deno.writeTextFileSync(path+filename, exFiles[filename])
+				Deno.writeTextFileSync(outPath, exFiles[filename])
 			} else {
-				Deno.writeFileSync(path+filename, exFiles[filename])
+				Deno.writeFileSync(outPath, exFiles[filename])
 			}
 		}
 	}

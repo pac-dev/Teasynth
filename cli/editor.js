@@ -1,5 +1,7 @@
-import { serve, serveFile, copy, exists, join, dirname } from './deps.js';
+import { serve, serveFile, copy, exists, path } from './deps.js';
 import { path2proj } from './build.js';
+
+const join = path.join;
 
 const req2jsonObj = async (reqPath, config) => {
 	// remove trailing '/project.json'
@@ -31,7 +33,7 @@ const scaredCopy = async (src, dst, yes) => {
 
 export const readConfig = async (args, teaDir) => {
 	const configPath = args['config'] ?? join(teaDir, 'cli/projects.default.json');
-	const configDir = dirname(configPath);
+	const configDir = path.dirname(configPath);
 	const config = JSON.parse(await Deno.readTextFile(configPath));
 	if (args['config']) {
 		console.log('Loaded config:');
@@ -71,12 +73,13 @@ export const serveEditor = (config, teaDir) => {
 };
 
 export const generateEditor = async (config, teaDir, outDir, yes) => {
-	Deno.mkdirSync(outDir, {recursive: true});
+	await Deno.mkdir(outDir, { recursive: true });
 	await scaredCopy(join(teaDir, 'editor-static'), outDir, yes);
 	await scaredCopy(join(teaDir, 'editor-js'), join(outDir, 'editor-js'), yes);
 	await scaredCopy(join(teaDir, 'core'), join(outDir, 'core'), yes);
 	for (let [urlPath, srcPath] of Object.entries(config.projects)) {
 		if (!await exists(srcPath)) return console.log('Could not find ' + srcPath);
+		await Deno.mkdir(join(outDir, urlPath), { recursive: true });
 		const dstPath = join(outDir, urlPath, 'project.json');
 		const proj = path2proj(srcPath);
 		if (yes) {
