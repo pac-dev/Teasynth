@@ -94,6 +94,7 @@ const applyUrlFragment = parsedFragment => {
 		if (old && (val < old.min || val > old.max)) alert('URL param out of range: ' + name);
 		else if (old) old.val = val;
 		else dt.params.push({ name, val, min: Number.MIN_VALUE, max: Number.MAX_VALUE });
+		if (dt.status === 'playing') dt.track.setParam(name, val);
 	}
 };
 window.addEventListener('hashchange', () => {
@@ -103,6 +104,8 @@ window.addEventListener('hashchange', () => {
 });
 /** @param {Project} proj */
 const setProject = (proj, filePath = '') => {
+	stopAll();
+	devTracks.length = 0;
 	editor.setProject(proj);
 	proj.root.collapseDescendants();
 	if (!goToFilePath(filePath)) goToFilePath(proj.getDefaultMain().path);
