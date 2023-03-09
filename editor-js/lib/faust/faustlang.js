@@ -84,7 +84,7 @@ const faustFunctions = [
 ];
 const getFile = async (fileName, faust) => {
     // if (faust) return faust.fs.readFile("libraries/" + fileName, { encoding: "utf8" });
-    const libPath = "/editor-js/lib/faust/libraries/";
+    const libPath = window.tsStaticUrl+"editor-js/lib/faust/libraries/";
     const res = await fetch(libPath + fileName);
     return res.text();
 };

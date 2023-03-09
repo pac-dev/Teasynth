@@ -110,11 +110,11 @@ const setProject = (proj, filePath = '') => {
 	proj.root.collapseDescendants();
 	if (!goToFilePath(filePath)) goToFilePath(proj.getDefaultMain().path);
 };
+const staticUrl = new URL(window.tsStaticUrl, document.baseURI).href;
+const projectUrl = new URL(window.tsProjectUrl, document.baseURI).href;
+const serviceScope = new URL(window.tsServiceScope, document.baseURI).href;
 const loadJson = async () => {
-	let projPath = location.pathname;
-	if (!projPath.endsWith('/')) projPath += '/';
-	projPath += 'project.json';
-	let obj, resp = await fetch(projPath);
+	let obj, resp = await fetch(projectUrl);
 	try { obj = await resp.json(); }
 	catch (error) { return alert('Project not found.'); }
 	proj = Project.fromJsonObj(obj);
@@ -124,9 +124,8 @@ const loadJson = async () => {
 	applyUrlFragment(parsedFragment);
 };
 loadJson();
-const origin = new URL(location.href).origin;
-const monacoUrl = origin + '/editor-js/lib/monaco/min';
-initService(origin + '/'); // async
+const monacoUrl = staticUrl + 'editor-js/lib/monaco/min';
+initService(serviceScope); // async
 
 /** @param {ProjDir} dir */
 const newFileInDir = dir => {
