@@ -84,9 +84,9 @@ export const createTrack = async ({url, processorName, callbacks, initParams, wa
 	const ret = new PlayingTrack({url, processorName, callbacks, audioContext, initParams});
 	await ret.init();
 	if (ret.playResult.type === 'wrong samplerate') {
-		if (audioContext) throw new Error('Nodes require conflicting sample rates: '+processorName);
 		audioContext.close();
-		ret.audioContext = initContext(ret.playResult.wantRate);
+		audioContext = initContext(ret.playResult.wantRate);
+		ret.audioContext = audioContext;
 		await ret.init();
 	}
 	if (ret.playResult.type !== 'main ready') throw new Error('Error adding node: '+processorName);
