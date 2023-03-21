@@ -9,6 +9,7 @@ proj.root.addChild(new ProjFile('main.js', ''));
 let editingFile = proj.getDefaultMain();
 let lastMain = editingFile;
 const playCurrent = async () => {
+	experimentalWarning = undefined;
 	let main = editingFile.closestMain;
 	if (!main) main = lastMain;
 	if (!proj.includes(main)) throw new Error('No main file to play.');
@@ -285,10 +286,15 @@ const TopLinks = {
 	]
 };
 
+let experimentalWarning = `Live compilation and playback is an experimental feature.
+
+Open your browser's Javascript console (F12) to see compilation output.`;
+
 const Tools = {
 	view: () => [
 		m('.tool', {
 			onclick: () => {
+				if (experimentalWarning) alert(experimentalWarning);
 				playCurrent();
 				editor.focus();
 			}

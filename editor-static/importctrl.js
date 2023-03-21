@@ -3,12 +3,10 @@
 if (!self.builds) self.builds = {};
 
 const addBuild = cmdData => {
-	console.log('Adding files for '+cmdData.buildId);
 	self.builds[cmdData.buildId] = cmdData.files;
 };
 
 const removeBuild = cmdData => {
-	console.log('Removing files for '+cmdData.buildId);
 	delete self.builds[cmdData.buildId];
 };
 
