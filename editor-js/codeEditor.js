@@ -139,7 +139,8 @@ export class CodeEditor {
 					},
 					store() {},
 					onWillSaveState() {},
-					onDidChangeStorage() {}
+					onDidChangeStorage() {},
+					onDidChangeValue() {},
 				}
 			});
 			registerSporth();

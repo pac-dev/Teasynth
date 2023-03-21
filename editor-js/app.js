@@ -34,9 +34,9 @@ window.exportProject = async () => {
 	a.download = 'project.json';
 	a.click();
 };
-editor.addShortcut('Alt+KEY_1', 'Play', () => playCurrent());
-editor.addShortcut('Alt+KEY_2', 'Stop', () => stopAll());
-editor.addShortcut('Alt+KEY_3', 'Previous File', () => {
+editor.addShortcut('Alt+Digit1', 'Play', () => playCurrent());
+editor.addShortcut('Alt+Digit2', 'Stop', () => stopAll());
+editor.addShortcut('Alt+Digit3', 'Previous File', () => {
 	const files = [...proj.files].filter(f => !f.isDir);
 	if (files.length < 2) return;
 	let currentIdx = files.findIndex(f => f == editingFile);
@@ -44,7 +44,7 @@ editor.addShortcut('Alt+KEY_3', 'Previous File', () => {
 	editingFile = files[(files.length+currentIdx-1)%files.length];
 	m.redraw();
 });
-editor.addShortcut('Alt+KEY_4', 'Next File', () => {
+editor.addShortcut('Alt+Digit4', 'Next File', () => {
 	const files = [...proj.files].filter(f => !f.isDir);
 	if (files.length < 2) return;
 	let currentIdx = files.findIndex(f => f == editingFile);
