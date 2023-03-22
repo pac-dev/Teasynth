@@ -390,6 +390,8 @@ const ParamsCorner = {
 const Layout = {
 	view: () => [
 		m('.layout', [
+			m('input.collapser', { id: 'collapser', type: 'checkbox' }),
+			m('label.collapser', { for: 'collapser' }),
 			m('.project_pane', [
 				m('.project_head', m(TopLinks)),
 				m('.project_files', m(FileList)),
@@ -397,7 +399,7 @@ const Layout = {
 			m('.code_pane', m(CodeContainer)),
 			m('.tool_pane', m(Tools))
 		]),
-		m('.params_corner', m(ParamsCorner))
+		m('.params_corner', m(ParamsCorner)),
 	]
 };
 

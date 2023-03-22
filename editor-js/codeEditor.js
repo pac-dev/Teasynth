@@ -22,6 +22,17 @@ const createModel = f => {
 	return model;
 }
 
+const onResize = (editor) => {
+	const optId = monaco.editor.EditorOptions.lineNumbers.id;
+	const isMobile = (editor.getOption(optId).renderType === 0);
+	const shouldMobile = window.matchMedia("(max-width: 940px)").matches;
+	if (!isMobile && shouldMobile) {
+		editor.updateOptions({'lineNumbers': 'off', fontSize: 12, 'minimap': { 'enabled': false }});
+	} else if (isMobile && !shouldMobile) {
+		editor.updateOptions({'lineNumbers': 'on', fontSize: 14, 'minimap': { 'enabled': true }});
+	}
+};
+
 export class CodeEditor {
 	/** @param {Project} proj */
 	constructor(proj, currentFileId) {
@@ -154,6 +165,8 @@ export class CodeEditor {
 			this.ready = true;
 			this.updateFiles();
 			this.shortcuts.forEach(s => this.loadedAddShortcut(...s));
+			window.addEventListener('resize', () => onResize(this.editor));
+			onResize(this.editor);
 			this.onLoaded();
 		});
 	}

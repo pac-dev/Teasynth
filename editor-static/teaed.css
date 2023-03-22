@@ -71,7 +71,6 @@ input.renamer.renaming {
 	padding: 1.3rem;
 	min-width: 3rem;
 	text-align: center;
-	touch-action: none;
 	user-select: none;
 }
 
@@ -117,7 +116,6 @@ input.renamer.renaming {
 }
 .file_item > .path {
 	padding: 0.3rem 0.6rem 0.3rem 1rem;
-	touch-action: none;
 	user-select: none;
 }
 .filebtn {
@@ -177,7 +175,6 @@ input.renamer.renaming {
 .tool {
 	padding: 1.3rem;
 	text-align: center;
-	touch-action: none;
 	user-select: none;
 }
 .tool:hover {
@@ -198,9 +195,46 @@ input.renamer.renaming {
 	margin: 1rem;
 	display: inline-block;
 	pointer-events: auto;
-	touch-action: none;
 	user-select: none;
 }
 .param, .params_title {
 	padding: 1rem;
+}
+
+
+/** mobile **/
+
+input.collapser, label.collapser { display: none; }
+@media (max-width: 940px) {
+	.layout { grid-template-columns: 1fr; }
+	label.collapser {
+		display: block;
+		position: fixed;
+		right: 13px;
+		width: 45px;
+		height: 45px;
+		top: 5px;
+		cursor: pointer;
+		z-index: 2;
+		background: #eee;
+	}
+	label.collapser::before {
+		content: '';
+		position: absolute;
+		left: 8px;
+		width: 29px;
+		height: 5px;
+		background: #bbb;
+		box-shadow: 0 12px 0 0 #bbb, 0 24px 0 0 #bbb;
+		top: 7px;
+	}
+	input.collapser:checked ~ label.collapser{
+		transform: rotate(90deg);
+	}
+	input.collapser:not(:checked) ~ .project_pane{
+		display: none;
+	}
+	input.collapser:not(:checked) ~ .tool_pane{
+		display: none;
+	}
 }
