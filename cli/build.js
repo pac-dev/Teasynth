@@ -1,4 +1,4 @@
-import { path } from './deps.js';
+import { path, bundle } from './deps.js';
 import { compileFaust } from '../core/faustCompiler.js';
 import { Project, ProjFile, ProjDir } from '../core/project.js';
 import { makeWorklet } from '../core/worklet.js';
@@ -54,17 +54,21 @@ const buildTrack = async (proj, main) => {
 	const sources = {};
 	for (let file of proj.files) {
 		if (file.isDir) continue;
-		sources['/' + file.path] = file.content;
+		sources['file:///' + file.path] = file.content;
 	}
-	sources['/export_worklet.js'] = makeWorklet('./'+main.path, './host.js', trackName);
+	sources['file:///export_worklet.js'] = makeWorklet('./'+main.path, './host.js', trackName);
+	const load = async (path) => ({
+		kind: 'module',
+		specifier: path,
+		content: sources[path]
+	});
+	// note: compilerOptions doesn't work, and inline source maps are included anyways.
+	// this is a regression from previous deno versions.
+	// for updates, see: https://github.com/denoland/deno_emit/issues/29
+	const compilerOptions = { sourceMap: false, inlineSourceMap: false };
 	console.log(`bundling ${main.parent.path}...`);
-	const { files } = await Deno.emit(
-		"/export_worklet.js",
-		{ sources, bundle: "module" }
-	);
-	const outFiles = {
-		[trackName+'.js']: files['deno:///bundle.js']
-	};
+	const { code } = await bundle('/export_worklet.js', { load, compilerOptions });
+	const outFiles = { [trackName+'.js']: code };
 	const faustSources = [...main.parent.descendants].filter(f => f.name.endsWith('.dsp'));
 	console.log('compiling Faust souces...');
 	for (let f of faustSources) {
