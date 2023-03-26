@@ -15,7 +15,7 @@ let service;
  * @property {PlayingTrack} track
  * @property {Array} params
  * @property {ProjFile} main
- * @property {('playing'|'loading'|'stopped')} status
+ * @property {('proposed'|'playing'|'loading'|'stopped')} status
  */
 
 /** @type {Array.<DevTrack>} */
@@ -70,6 +70,8 @@ export const devStop = async dt => {
 	dt.status = 'stopped';
 };
 
+export const parseParamStr = (str) => Function(`"use strict"; return parseFloat(${str})`)();
+
 const playUrl = async dt => {
 	const callbacks = {
 		fetchMainRelative(path) {
@@ -82,13 +84,19 @@ const playUrl = async dt => {
 	};
 	const initParams = Object.fromEntries(dt.params.map(p => [p.name, p.val]));
 	dt.track = await createTrack({url: dt.shimUrl, processorName: dt.processorName, callbacks, initParams});
-	/** @type {Array.<Object>} */
 	const oldParams = dt.params;
+	// old/init params are kept by the track unless they are out of bounds
+	// note that the type (text or number/slider) may have changed
 	dt.params = dt.track.paramSpecs.map(spec => {
-		spec.val = spec.def;
-		const old = oldParams.find(p => p.name === spec.name && p.val >= spec.min && p.val <= spec.max);
-		if (old) spec.val = old.val;
-		return spec;
+		let val = spec.def;
+		let valStr = spec.defStr;
+		const old = oldParams.find(p => p.name === spec.name);
+		if (old && old.val >= spec.min && old.val <= spec.max) val = old.val;
+		if (old && spec.defStr && val === old.val) {
+			if (old.valStr) valStr = old.valStr;
+			else valStr = val.toString();
+		}
+		return { name: spec.name, val, valStr, min: spec.min, max: spec.max };
 	});
 	dt.status = 'playing';
 };

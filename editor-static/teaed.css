@@ -197,9 +197,8 @@ input.renamer.renaming {
 	pointer-events: auto;
 	user-select: none;
 }
-.param, .params_title {
-	padding: 1rem;
-}
+.param, .params_title { padding: 1rem; }
+.param input { width: 160px; }
 
 
 /** mobile **/

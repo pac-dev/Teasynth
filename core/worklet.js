@@ -57,8 +57,9 @@ export const makeWorklet = (mainUrl, hostUrl, processorName) => `
 		for (let name of Object.keys(mainHost.params)) {
 			const param = mainHost.params[name];
 			paramSpecs.push({...param, name, setFn: false});
-			if (name in data.initParams) {
-				param.setFn(parseFloat(data.initParams[name]));
+			const ip = data.initParams[name];
+			if (ip !== undefined && param.min <= ip && ip <= param.max ) {
+				param.setFn(ip);
 			}
 		}
 		await runHostCmd(port, {cmd: 'defineParams', paramSpecs});
