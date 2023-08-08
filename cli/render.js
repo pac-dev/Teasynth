@@ -66,14 +66,17 @@ export const createRenderer = track => {
 	const sr = 44100;
 	const buf = new Float32Array(bufFrames*2);
 	const buf2 = new Float32Array(bufFrames*2);
+	const bufView = new Uint8Array(buf.buffer);
+	const bufView2 = new Uint8Array(buf2.buffer);
 	const pipes = new Set();
 	const xf = x => -1 * Math.pow(-0.5 * Math.cos((x + 1)*Math.PI) + 0.5, 1.772) + 1;
 	return {
 		async addOutput(outPath) {
-			const ret = Deno.run({
-				cmd: ['ffmpeg', '-y', '-f', 'f32le', '-channels', '2', '-i', 'pipe:0', outPath],
-				stdin: 'piped', stderr: 'piped'
-			});
+			const ext = outPath.split('.').at(-1);
+			const cmd = ['ffmpeg', '-y', '-f', 'f32le', '-channels', '2', '-i', 'pipe:0'];
+			if (ext === 'mp3') cmd.push('-b:a', '192k');
+			cmd.push(outPath);
+			const ret = Deno.run({ cmd, stdin: 'piped', stderr: 'piped' });
 			pipes.add(ret);
 			return ret;
 		},
@@ -91,9 +94,9 @@ export const createRenderer = track => {
 				for (let p of pipes) {
 					if (p.xf) {
 						copyAmp(buf, buf2, p.xf());
-						await p.stdin.write(buf2);
+						await p.stdin.write(bufView2);
 					} else {
-						await p.stdin.write(buf);
+						await p.stdin.write(bufView);
 					}
 				}
 				if (track.host.wantInterrupt) {
