@@ -8,13 +8,13 @@ let proj = new Project('Empty project');
 proj.root.addChild(new ProjFile('main.js', ''));
 let editingFile = proj.getDefaultMain();
 let lastMain = editingFile;
-const playCurrent = async () => {
+const playCurrent = async ({multi=false}={}) => {
 	experimentalWarning = undefined;
 	let main = editingFile.closestMain;
 	if (!main) main = lastMain;
 	if (!proj.includes(main)) throw new Error('No main file to play.');
 	lastMain = main;
-	await devPlay(proj, main);
+	await devPlay(proj, main, multi);
 	m.redraw();
 };
 const stopAll = async () => {
@@ -36,6 +36,7 @@ window.exportProject = async () => {
 	a.click();
 };
 editor.addShortcut('Alt+Digit1', 'Play', () => playCurrent());
+editor.addShortcut('Alt+Shift+Digit1', 'Play Multi', () => playCurrent({ multi: true }));
 editor.addShortcut('Alt+Digit2', 'Stop', () => stopAll());
 editor.addShortcut('Alt+Digit3', 'Previous File', () => {
 	const files = [...proj.files].filter(f => !f.isDir);
@@ -87,7 +88,7 @@ const applyUrlFragment = parsedFragment => {
 	const trackName = main.parent.name;
 	let oldi = devTracks.findIndex(t => t.name === trackName);
 	if (oldi !== -1) {
-		devTracks[oldi].track.stop();
+		if (devTracks[oldi].track) devTracks[oldi].track.stop();
 		devTracks.splice(oldi, 1);
 	}
 	const dt = { main, name: trackName, params: parsedFragment.params, status: 'proposed' };
@@ -300,6 +301,15 @@ const Tools = {
 				editor.focus();
 			}
 		}, 'stop'),
+		m('.tool_menu', [
+			m('.tool', '•••'),
+			m('.tool', {
+				onclick: () => {
+					playCurrent({ multi: true });
+					editor.focus();
+				}
+			}, 'play multi'),
+		])
 	]
 };
 

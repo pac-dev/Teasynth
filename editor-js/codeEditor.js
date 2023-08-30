@@ -97,19 +97,12 @@ export class CodeEditor {
 		}
 	}
 	loadedAddShortcut(shortcut, label, run) {
-		let key;
 		const parts = shortcut.split('+');
-		if (parts.length == 1)
-			key = monaco.KeyCode[parts[1]];
-		else if (parts.length == 2)
-			key = monaco.KeyMod[parts[0]] | monaco.KeyCode[parts[1]];
-		else
-			throw new Error('Unsupported shortcut type.');
+		const last = monaco.KeyCode[parts.pop()];
+		const key = parts.map(p => monaco.KeyMod[p]).concat(last).reduce((a, b) => a | b);
 		this.editor.addAction({
 			id: label.replaceAll(' ', '-'),
-			label, keybindings: [key],
-			// @param editor The editor instance is passed in as a convenience
-			run
+			label, keybindings: [key], run
 		});
 	}
 	switchToFile(id) {

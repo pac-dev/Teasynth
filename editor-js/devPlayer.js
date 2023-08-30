@@ -105,14 +105,14 @@ const playUrl = async dt => {
  * @param {Project} proj
  * @param {ProjFile} main
  */
-export const devPlay = async (proj, main) => {
+export const devPlay = async (proj, main, multi=false) => {
 	console.log('Playing '+main.path);
 	if (!service) throw new Error('Service worker not ready.');
 	const name = main.parent.path;
 	let dt = devTracks.find(t => t.name === name);
-	// It seems impossible to distinguish between error state and loading state,
-	// so let's just call stop and clean up any existing resources.
-	if (dt) {
+	if (dt && !multi) {
+		// It seems impossible to distinguish between error state and loading state,
+		// so let's just call stop and clean up any existing resources.
 		await devStop(dt);
 	} else {
 		dt = { name, main, params: [], status: 'loading' };

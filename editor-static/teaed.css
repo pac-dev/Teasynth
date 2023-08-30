@@ -180,6 +180,12 @@ input.renamer.renaming {
 .tool:hover {
 	background: #fff3;
 }
+.tool_menu > .tool { display: none; }
+.tool_menu:hover > .tool { display: block; }
+.tool_menu > .tool:first-child {
+	display: block;
+	color: #666;
+}
 
 
 /** params **/
