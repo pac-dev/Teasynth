@@ -8,6 +8,7 @@ let proj = new Project('Empty project');
 proj.root.addChild(new ProjFile('main.js', ''));
 let editingFile = proj.getDefaultMain();
 let lastMain = editingFile;
+let minimized = false;
 const playCurrent = async ({multi=false}={}) => {
 	experimentalWarning = undefined;
 	let main = editingFile.closestMain;
@@ -286,6 +287,8 @@ let experimentalWarning = `Live compilation and playback is an experimental feat
 
 Open your browser's Javascript console (F12) to see compilation output.`;
 
+const viewTracks = () => devTracks.filter(dt => dt.status === 'playing' || dt.params.length);
+
 const Tools = {
 	view: () => [
 		m('.tool', {
@@ -309,7 +312,12 @@ const Tools = {
 					editor.focus();
 				}
 			}, 'play multi'),
-		])
+		]),
+		...(viewTracks().length ? [
+			m('.tool.bottom', {
+				onclick: () => { minimized = !minimized; }
+			}, minimized ? '🠥' : '🠧')
+		] : [])
 	]
 };
 
@@ -416,9 +424,10 @@ const ParamsTrack = dt => [
 ];
 
 const ParamsCorner = {
-	view: () => devTracks
-		.filter(dt => dt.status === 'playing' || dt.params.length)
-		.map(devTrack => m('.params_track', ParamsTrack(devTrack)))
+	view: () => {
+		if (minimized) return [];
+		return viewTracks().map(devTrack => m('.params_track', ParamsTrack(devTrack)));
+	}
 };
 
 const Layout = {

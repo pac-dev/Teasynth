@@ -44,6 +44,7 @@ body {
 	text-align: center;
 	display: grid;
     grid-auto-rows: max-content;
+	position: relative;
 }
 
 /** shared **/
@@ -176,6 +177,13 @@ input.renamer.renaming {
 	padding: 1.3rem;
 	text-align: center;
 	user-select: none;
+}
+.tool.bottom {
+	font-size: 18px;
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	right: 0;
 }
 .tool:hover {
 	background: #fff3;
