@@ -1,7 +1,7 @@
 import { CodeEditor } from './codeEditor.js';
 import { m } from './lib/mithrilModule.js';
 import { ProjDir, Project, ProjFile } from '../core/project.js';
-import { initService, devPlay, devStop, devTracks, parseParamStr } from './devPlayer.js';
+import { initService, DevTrack, devTracks, parseParamStr } from './devPlayer.js';
 import { fsOpen, fsSave, fsSaveAs, canSave } from './fsa.js';
 
 let proj = new Project('Empty project');
@@ -9,20 +9,20 @@ proj.root.addChild(new ProjFile('main.js', ''));
 let editingFile = proj.getDefaultMain();
 let lastMain = editingFile;
 let minimized = false;
-const playCurrent = async ({multi=false}={}) => {
+const playCurrent = async ({override=true}={}) => {
 	experimentalWarning = undefined;
 	let main = editingFile.closestMain;
 	if (!main) main = lastMain;
 	if (!proj.includes(main)) throw new Error('No main file to play.');
 	lastMain = main;
-	await devPlay(proj, main, multi);
+	let devTrack;
+	if (override) devTrack = devTracks.findLast(dt => dt.main === main);
+	if (!devTrack) devTrack = new DevTrack(proj, main);
+	await devTrack.play();
 	m.redraw();
 };
 const stopAll = async () => {
-	for (let dt of devTracks) {
-		if (dt.status !== 'playing') continue;
-		await devStop(dt);
-	}
+	for (let dt of devTracks) await dt.stop();
 	m.redraw();
 };
 const editor = new CodeEditor(proj, editingFile.id);
@@ -37,7 +37,7 @@ window.exportProject = async () => {
 	a.click();
 };
 editor.addShortcut('Alt+Digit1', 'Play', () => playCurrent());
-editor.addShortcut('Alt+Shift+Digit1', 'Play Multi', () => playCurrent({ multi: true }));
+editor.addShortcut('Alt+Shift+Digit1', 'Play Multi', () => playCurrent({ override: false }));
 editor.addShortcut('Alt+Digit2', 'Stop', () => stopAll());
 editor.addShortcut('Alt+Digit3', 'Previous File', () => {
 	const files = [...proj.files].filter(f => !f.isDir);
@@ -86,14 +86,9 @@ const parseUrlFragment = () => {
 const applyUrlFragment = parsedFragment => {
 	goToFilePath(parsedFragment.filePath);
 	const main = editingFile.closestMain;
-	const trackName = main.parent.name;
-	let oldi = devTracks.findIndex(t => t.name === trackName);
-	if (oldi !== -1) {
-		if (devTracks[oldi].track) devTracks[oldi].track.stop();
-		devTracks.splice(oldi, 1);
-	}
-	const dt = { main, name: trackName, params: parsedFragment.params, status: 'proposed' };
-	devTracks.push(dt);
+	const dt = new DevTrack(proj, main);
+	dt.params = parsedFragment.params;
+	dt.status = 'linked';
 };
 window.addEventListener('hashchange', () => {
 	applyUrlFragment(parseUrlFragment());
@@ -308,7 +303,7 @@ const Tools = {
 			m('.tool', '•••'),
 			m('.tool', {
 				onclick: () => {
-					playCurrent({ multi: true });
+					playCurrent({ override: false });
 					editor.focus();
 				}
 			}, 'play multi'),
@@ -326,7 +321,7 @@ const trackStopper = dt => {
 	if (dt.status === 'playing') {
 		return m('', {
 			onclick: async () => {
-				await devStop(dt);
+				await dt.stop();
 				m.redraw();
 			},
 			style: { display: 'inline', fontWeight: 600 }
@@ -336,7 +331,7 @@ const trackStopper = dt => {
 			onclick: async () => {
 				if (experimentalWarning) alert(experimentalWarning);
 				experimentalWarning = undefined;
-				await devPlay(proj, dt.main);
+				await dt.play();
 				m.redraw();
 			},
 			style: { display: 'inline', fontWeight: 600 }
@@ -389,14 +384,14 @@ const paramSlider = (dt, par) => [
 
 /** @param {import('./devPlayer.js').DevTrack} dt */
 const paramInput = (dt, par) => {
-	if (dt.status === 'proposed') return [];
+	if (dt.status === 'linked') return [];
 	if (par.valStr) return paramTextInput(dt, par);
 	return paramSlider(dt, par);
 };
 
 const paramLabel = (dt, par) => {
 	let ret = par.name + ': ';
-	if (dt.status === 'proposed') return ret + par.valStr;
+	if (dt.status === 'linked') return ret + par.valStr;
 	if (par.valStr) return ret;
 	return ret + Math.round(par.val*1000)/1000;
 };
