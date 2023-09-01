@@ -103,6 +103,18 @@ export class DevTrack {
 		});
 		this.status = 'playing';
 	}
+	async scanParams() {
+		await this.stop();
+		await this.pushBuild();
+		this.params = [];
+		const hostMod = await import(this.hostUrl);
+		const mainMod = await import(this.mainUrl);
+		if (mainMod.instantiate) await mainMod.instantiate();
+		await hostMod.mainHost.events.trigger('got host');
+		for (let [name, spec] of Object.entries(hostMod.mainHost.params)) {
+			this.params.push({...spec, name, val: spec.def, valStr: spec.defStr, setFn: false});
+		}
+	}
 	async stop() {
 		if (!service) throw new Error('Service worker not ready.');
 		if (this.buildId) {

@@ -21,6 +21,15 @@ const playCurrent = async ({override=true}={}) => {
 	await devTrack.play();
 	m.redraw();
 };
+const showParams = async () => {
+	let main = editingFile.closestMain;
+	if (!main) main = lastMain;
+	if (!proj.includes(main)) throw new Error('No main file to play.');
+	lastMain = main;
+	const devTrack = new DevTrack(proj, main);
+	await devTrack.scanParams();
+	m.redraw();
+};
 const stopAll = async () => {
 	for (let dt of devTracks) await dt.stop();
 	m.redraw();
@@ -307,10 +316,19 @@ const Tools = {
 					editor.focus();
 				}
 			}, 'play multi'),
+			m('.tool', {
+				onclick: () => {
+					showParams();
+					editor.focus();
+				}
+			}, 'show params'),
 		]),
 		...(viewTracks().length ? [
 			m('.tool.bottom', {
-				onclick: () => { minimized = !minimized; }
+				onclick: () => {
+					minimized = !minimized;
+					editor.focus();
+				}
 			}, minimized ? '🠥' : '🠧')
 		] : [])
 	]
