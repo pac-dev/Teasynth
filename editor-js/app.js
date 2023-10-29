@@ -3,12 +3,38 @@ import { m } from './lib/mithrilModule.js';
 import { ProjDir, Project, ProjFile } from '../core/project.js';
 import { initService, DevTrack, devTracks, parseParamStr } from './devPlayer.js';
 import { fsOpen, fsSave, fsSaveAs, canSave } from './fsa.js';
+import { macroEvents, macros, macroStatus } from '../core/macro.js';
 
 let proj = new Project('Empty project');
 proj.root.addChild(new ProjFile('main.js', ''));
 let editingFile = proj.getDefaultMain();
 let lastMain = editingFile;
 let minimized = false;
+macroEvents.fileChanged = () => { editor.updateFiles() };
+macroEvents.startTrack = (trackName, params, devTrack) => {
+	devTrack ??= new DevTrack(proj, trackName2File(trackName));
+	params.forEach(p => { p.val = parseParamStr(p.valStr); });
+	devTrack.params = params;
+	(async () => {
+		await devTrack.play();
+		m.redraw();
+	})();
+	return devTrack;
+};
+macroEvents.tweakTrack = (devTrack, param) => {
+	param.val = parseParamStr(param.valStr);
+	devTrack.track.setParam(param.name, param.val);
+	const oldParam = devTrack.params.find(p => p.name === param.name);
+	if (oldParam) oldParam.val = param.val;
+	if (oldParam && oldParam.valStr) oldParam.valStr = param.valStr;
+	m.redraw();
+};
+macroEvents.stopTrack = async (devTrack) => {
+	await devTrack.stop();
+	m.redraw();
+};
+macroEvents.statusChanged = () => m.redraw();
+
 const playCurrent = async ({override=true}={}) => {
 	experimentalWarning = undefined;
 	let main = editingFile.closestMain;
@@ -18,6 +44,7 @@ const playCurrent = async ({override=true}={}) => {
 	let devTrack;
 	if (override) devTrack = devTracks.findLast(dt => dt.main === main);
 	if (!devTrack) devTrack = new DevTrack(proj, main);
+	macros.recEvent({ type: 'start' }, devTrack);
 	await devTrack.play();
 	m.redraw();
 };
@@ -31,10 +58,14 @@ const showParams = async () => {
 	m.redraw();
 };
 const stopAll = async () => {
-	for (let dt of devTracks) await dt.stop();
+	for (let dt of devTracks) {
+		await dt.stop();
+		macros.recEvent({ type: 'stop' }, dt);
+	}
 	m.redraw();
 };
 const editor = new CodeEditor(proj, editingFile.id);
+macroEvents.setHighlight = editor.setHighlight.bind(editor);
 window.getProject = () => proj;
 window.getEditor = () => editor;
 window.exportProject = async () => {
@@ -45,10 +76,10 @@ window.exportProject = async () => {
 	a.download = 'project.json';
 	a.click();
 };
-editor.addShortcut('Alt+Digit1', 'Play', () => playCurrent());
-editor.addShortcut('Alt+Shift+Digit1', 'Play Multi', () => playCurrent({ override: false }));
-editor.addShortcut('Alt+Digit2', 'Stop', () => stopAll());
-editor.addShortcut('Alt+Digit3', 'Previous File', () => {
+editor.addShortcut('Alt+Digit1', 'Teasynth: Play', () => playCurrent());
+editor.addShortcut('Alt+Shift+Digit1', 'Teasynth: Play Multi', () => playCurrent({ override: false }));
+editor.addShortcut('Alt+Digit2', 'Teasynth: Stop', () => stopAll());
+editor.addShortcut('Alt+Digit3', 'Teasynth: Previous File', () => {
 	const files = [...proj.files].filter(f => !f.isDir);
 	if (files.length < 2) return;
 	let currentIdx = files.findIndex(f => f == editingFile);
@@ -56,7 +87,7 @@ editor.addShortcut('Alt+Digit3', 'Previous File', () => {
 	editingFile = files[(files.length+currentIdx-1)%files.length];
 	m.redraw();
 });
-editor.addShortcut('Alt+Digit4', 'Next File', () => {
+editor.addShortcut('Alt+Digit4', 'Teasynth: Next File', () => {
 	const files = [...proj.files].filter(f => !f.isDir);
 	if (files.length < 2) return;
 	let currentIdx = files.findIndex(f => f == editingFile);
@@ -64,16 +95,19 @@ editor.addShortcut('Alt+Digit4', 'Next File', () => {
 	editingFile = files[(currentIdx+1)%files.length];
 	m.redraw();
 });
-const goToFilePath = path => {
-	const file = proj.findByPath(path);
+editor.addShortcut('Alt+Digit5', 'Teasynth: Play Line', () => {
+	macros.playLine(editingFile.content.split('\n')[editor.editor.getPosition().lineNumber-1]);
+});
+const trackName2File = (name) => {
+	const file = proj.findByPath(name);
+	if (!file) return;
+	else if (file.isDir) return file.findChild('main.js');
+	else return file;
+};
+const goToTrackName = trackName => {
+	const file = trackName2File(trackName);
 	if (!file) return false;
-	if (file.isDir) {
-		const main = file.findChild('main.js');
-		if (main) editingFile = main;
-		else return false;
-	} else {
-		editingFile = file;
-	}
+	editingFile = file;
 	editingFile.openAncestors();
 	m.redraw();
 	editor.focus();
@@ -93,7 +127,7 @@ const parseUrlFragment = () => {
 	return ret;
 };
 const applyUrlFragment = parsedFragment => {
-	goToFilePath(parsedFragment.filePath);
+	goToTrackName(parsedFragment.filePath);
 	const main = editingFile.closestMain;
 	const dt = new DevTrack(proj, main);
 	dt.params = parsedFragment.params;
@@ -110,7 +144,7 @@ const setProject = (proj, filePath = '') => {
 	devTracks.length = 0;
 	editor.setProject(proj);
 	proj.root.collapseDescendants();
-	if (!goToFilePath(filePath)) goToFilePath(proj.getDefaultMain().path);
+	if (!goToTrackName(filePath)) goToTrackName(proj.getDefaultMain().path);
 };
 const staticUrl = new URL(window.tsStaticUrl, document.baseURI).href;
 const projectUrl = new URL(window.tsProjectUrl, document.baseURI).href;
@@ -140,15 +174,20 @@ const newFileInDir = dir => {
 };
 
 const makeRenamer = ({obj, getValue, setValue}) => {
+	/** @param {HTMLInputElement} input */
 	const renameHandler = input => {
 		if (!obj.renaming || document.activeElement === input)
 			return;
 		input.value = getValue();
 		input.focus();
-		input.setSelectionRange(
-			input.value.lastIndexOf('/') + 1,
-			input.value.lastIndexOf('.')
-		);
+		if (input.value.includes('/') && input.value.includes('/')) {
+			input.setSelectionRange(
+				input.value.lastIndexOf('/') + 1,
+				input.value.lastIndexOf('.')
+			);
+		} else {
+			input.setSelectionRange(0, input.value.length);
+		}
 	};
 	return m('input.renamer', {
 		class: (obj.renaming ? 'renaming' : ''),
@@ -290,8 +329,28 @@ const TopLinks = {
 let experimentalWarning = `Live compilation and playback is an experimental feature.
 
 Open your browser's Javascript console (F12) to see compilation output.`;
+if (window.location.host.includes('localhost')) experimentalWarning = undefined;
 
 const viewTracks = () => devTracks.filter(dt => dt.status === 'playing' || dt.params.length);
+
+const macroRec = () => m('.tool.macro', { onclick: () => macros.rec(editingFile) }, 'm-rec');
+const macroPlay = () => m('.tool.macro', { onclick: () => macros.play(editingFile) }, 'm-play');
+const macroPause = () => m('.tool.macro', { onclick: () => macros.pause() }, 'm-pause');
+const macroResume = () => m('.tool.macro', { onclick: () => macros.resume() }, 'm-resume');
+const macroStop = () => m('.tool.macro', { onclick: () => macros.stop() }, 'm-stop');
+const macroRecing = () => m('.tool.status', 'recording');
+const macroPlaying = () => m('.tool.status', 'playing');
+
+const macroTools = () => {
+	const editingMacro = editingFile.name.endsWith('.tmac');
+	switch(macroStatus()) {
+		case 'stopped': return editingMacro ? [macroRec(), macroPlay()] : [];
+		case 'playing': return [macroPlaying(), macroPause(), macroStop()];
+		case 'recording': return [macroRecing(), macroPause(), macroStop()];
+		case 'playing paused': return [macroPlaying(), macroResume(), macroStop()];
+		case 'recording paused': return [macroRecing(), macroResume(), macroStop()];
+	}
+};
 
 const Tools = {
 	view: () => [
@@ -323,6 +382,7 @@ const Tools = {
 				}
 			}, 'show params'),
 		]),
+		...macroTools(),
 		...(viewTracks().length ? [
 			m('.tool.bottom', {
 				onclick: () => {
@@ -340,6 +400,7 @@ const trackStopper = dt => {
 		return m('', {
 			onclick: async () => {
 				await dt.stop();
+				macros.recEvent({ type: 'stop' }, dt);
 				m.redraw();
 			},
 			style: { display: 'inline', fontWeight: 600 }
@@ -349,6 +410,8 @@ const trackStopper = dt => {
 			onclick: async () => {
 				if (experimentalWarning) alert(experimentalWarning);
 				experimentalWarning = undefined;
+				macros.recEvent({ type: 'start' }, dt);
+				editor.updateFiles();
 				await dt.play();
 				m.redraw();
 			},
@@ -372,7 +435,10 @@ const trackClearer = dt => {
 const applyParamText = (dt, par) => {
 	try { par.val = parseParamStr(par.valStr); }
 	catch { console.error('Could not parse param string: '+par.valStr); }
-	if (dt.status === 'playing') dt.track.setParam(par.name, par.val);
+	if (dt.status === 'playing') {
+		dt.track.setParam(par.name, par.val);
+		macros.recEvent({ type: 'tweak', params: [par] }, dt);
+	}
 };
 
 /** @param {import('./devPlayer.js').DevTrack} dt */
@@ -395,7 +461,10 @@ const paramSlider = (dt, par) => [
 		value: par.val,
 		oninput(e) { 
 			par.val = e.target.value;
-			if (dt.status === 'playing') dt.track.setParam(par.name, par.val);
+			if (dt.status === 'playing') {
+				dt.track.setParam(par.name, par.val);
+				macros.recEvent({ type: 'tweak', params: [par] }, dt);
+			}
 		}
 	}
 )];

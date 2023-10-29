@@ -39,6 +39,7 @@ export class CodeEditor {
 		this.ready = false;
 		this.fileModels = {};
 		this.fileStates = {};
+		this.fileHighlights = {};
 		this.currentFileId = currentFileId;
 		this.shortcuts = [];
 		this.setProject(proj);
@@ -68,6 +69,7 @@ export class CodeEditor {
 				this.fileModels[id].dispose();
 				delete this.fileModels[id];
 				delete this.fileStates[id];
+				delete this.fileHighlights[id];
 			}
 		}
 		for (let file of projFiles) {
@@ -105,6 +107,20 @@ export class CodeEditor {
 			label, keybindings: [key], run
 		});
 	}
+	setHighlight(file, startLine=-1, endLine=-1) {
+		if (startLine === -1) {
+			delete this.fileHighlights[file.id];
+			if (this.currentFileId === file.id) this.decorations.clear();
+		} else {
+			this.fileHighlights[file.id] = [{
+				range: new monaco.Range(startLine,1,endLine,1),
+				options: {isWholeLine: true, linesDecorationsClassName: 'playing_macro_line'}
+			}];
+			if (this.currentFileId === file.id) {
+				this.decorations.set(this.fileHighlights[file.id]);
+			}
+		}
+	}
 	switchToFile(id) {
 		if (this.currentFileId === id) return;
 		if (this.currentFileId)
@@ -113,6 +129,9 @@ export class CodeEditor {
 		if (this.fileStates[id]) {
 			// should work even if the model has been recreated
 			this.editor.restoreViewState(this.fileStates[id]);
+		}
+		if (this.fileHighlights[id]) {
+			this.decorations.set(this.fileHighlights[id]);
 		}
 		this.currentFileId = id;
 	}
@@ -160,6 +179,7 @@ export class CodeEditor {
 			this.shortcuts.forEach(s => this.loadedAddShortcut(...s));
 			window.addEventListener('resize', () => onResize(this.editor));
 			onResize(this.editor);
+			this.decorations = this.editor.createDecorationsCollection([]);
 			this.onLoaded();
 		});
 	}

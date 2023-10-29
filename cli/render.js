@@ -16,16 +16,22 @@ const importFile = async (filePath, bustCache) => {
 	return await import(filePath);
 };
 
+/**
+ * Load a teasynth track. Note that you can only have a single track loaded at a
+ * time. Once you switch tracks, you can't go back to the previous one. Using
+ * multiple threads or processes is currenly the only way around this.
+ */
 export const loadTrack = async mainPath => {
 	const hostPath = await findHostPath(mainPath);
 	if (!hostPath) throw new Error('could not find host.js');
 	const hostMod = await importFile(hostPath);
+	const mainHost = hostMod.mainHost;
 	const mainMod = await importFile(mainPath, true);
-	hostMod.mainHost.fetchMainRelative = async fetchPath => {
+	mainHost.fetchMainRelative = async fetchPath => {
 		fetchPath = path.join(mainPath, '..', fetchPath);
 		return await Deno.readTextFile(fetchPath);
 	};
-	hostMod.mainHost.compileFaust = async (code, internalMemory) => {
+	mainHost.compileFaust = async (code, internalMemory) => {
 		const comp = await compileFaust(code, internalMemory);
 		return { ui8Code: comp.ui8Code, dspMeta: comp.dspMeta };
 	};
@@ -33,15 +39,15 @@ export const loadTrack = async mainPath => {
 	if (mainMod.instantiate) {
 		process = await mainMod.instantiate();
 	}
-	await hostMod.mainHost.init();
+	await mainHost.init();
 	return {
 		setParams(vals) {
 			for (let [name, val] of Object.entries(vals)) {
-				if (!(name in hostMod.mainHost.params)) throw new Error('No param '+name);
-				hostMod.mainHost.params[name].setFn(parseFloat(val));
+				if (!(name in mainHost.params)) throw new Error('No param '+name);
+				mainHost.params[name].setFn(parseFloat(val));
 			}
 		},
-		host: hostMod.mainHost,
+		host: mainHost,
 		process
 	};
 };
@@ -61,7 +67,7 @@ const copyAmp = (src, tgt, amp) => {
 	}
 };
 
-export const createRenderer = track => {
+export const createRenderer = (track) => {
 	const bufFrames = 2048;
 	const sr = 44100;
 	const buf = new Float32Array(bufFrames*2);

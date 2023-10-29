@@ -85,7 +85,9 @@ export class DevTrack {
 				return [comp.ui8Code, comp.dspMeta];
 			}
 		};
-		const initParams = Object.fromEntries(this.params.map(p => [p.name, p.val]));
+		const initParams = Object.fromEntries(this.params.map(p => 
+			[p.name, typeof p.val === 'number' ? p.val : parseParamStr(p.val)]
+		));
 		this.track = await createTrack({url: shimUrl, processorName, callbacks, initParams});
 		const oldParams = this.params;
 		// old/init params are kept by the track unless they are out of bounds

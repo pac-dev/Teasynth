@@ -2,6 +2,8 @@ import { parse, bold, cyan, path } from './cli/deps.js';
 import { loadTrack, parseParamArgs, createRenderer } from './cli/render.js';
 import { build } from './cli/build.js';
 import { readConfig, serveEditor, generateEditor } from './cli/editor.js';
+import { playUpToStamp, macroEvents } from './core/macro.js';
+import { MultiRenderer, subprocess } from './cli/multirender.js';
 
 const cmd = txt => cyan(bold(txt));
 
@@ -20,6 +22,8 @@ Subcommands:
     Usage: ${cmd('teasynth serve-editor [--config FILE]')}
   ${cmd('generate-editor')}: Generate the Teasynth editor static website for deployment.
     Usage: ${cmd('teasynth generate-editor OUTDIR [--config FILE] [-y]')}
+  ${cmd('macro')}: Render a macro file to an audio file.
+    Usage: ${cmd('teasynth macro PROJDIR MACFILE OUTFILE')}
 `;
 
 const helpAndExit = () => {
@@ -60,7 +64,49 @@ const commandActions = {
 		const config = await readConfig(args, teaDir);
 		const outDir = args._[1];
 		await generateEditor(config, teaDir, outDir, args.y);
-	}
+	},
+	async macro(args) {
+		if (args._.length !== 4) helpAndExit();
+		console.time('macro rendering time');
+		const content = await Deno.readTextFile('./' + args._[2]);
+		const lines = content.split('\n');
+		const r = new MultiRenderer();
+
+		// i think the web version reuses params from oldTrack
+		// todo make this more consistent between versions
+		macroEvents.startTrack = (trackName, params, oldTrack) => {
+			const paramObj = {};
+			for (const p of params) paramObj[p.name] = p.valStr;
+			const mainPath = path.join(args._[1], trackName, 'main.js');
+			return r.addTrack(mainPath, paramObj);
+		};
+		macroEvents.tweakTrack = (cmdTrack, param) => {
+			if (!cmdTrack) throw new Error('no such track.');
+			r.tweakTrack(cmdTrack, { [param.name]: param.valStr });
+		};
+		macroEvents.stopTrack = (cmdTrack) => {
+			if (!cmdTrack) throw new Error('no such track.');
+			r.removeTrack(cmdTrack);
+		};
+		macroEvents.setHighlight = (file, lineNum) => {
+			console.log(lines[lineNum-1]);
+		};
+		console.log('rendering...');
+		const outHandle = await r.addOutput(args._[3]);
+		let nowStamp = 0;
+		while (true) {
+			const nextStamp = playUpToStamp(content, nowStamp);
+			if (nextStamp === Number.MAX_VALUE) {
+				await r.removeOutput(outHandle);
+				break;
+			}
+			await r.render((nextStamp - nowStamp)/1000);
+			nowStamp = nextStamp;
+		}
+		await r.finalize();
+		console.timeEnd('macro rendering time');
+	},
+	subprocess
 };
 
 if (import.meta.main) {

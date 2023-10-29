@@ -170,6 +170,9 @@ input.renamer.renaming {
 	width: 100%;
 	height: 100%;
 }
+.playing_macro_line {
+	border-bottom: 3px solid black;
+}
 
 
 /** tool pane **/
@@ -179,6 +182,8 @@ input.renamer.renaming {
 	text-align: center;
 	user-select: none;
 }
+.tool.macro { color: #e00; }
+.tool.status { font-style: italic; }
 .tool.bottom {
 	font-size: 18px;
 	position: absolute;
@@ -204,6 +209,9 @@ input.renamer.renaming {
 	bottom: 0;
 	right: 10rem;
 	pointer-events: none;
+    overflow-x: auto;
+    white-space: nowrap;
+    max-width: calc(100% - 10rem);
 }
 .params_track {
 	background-color: #c5c5de;
