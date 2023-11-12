@@ -1,5 +1,8 @@
 //#################################### dx7.lib #########################################
 // Yamaha DX7 emulation library. Its official prefix is `dx`.
+//
+// #### References
+// * <https://github.com/grame-cncm/faustlibraries/blob/master/dx7.lib>
 //########################################################################################
 // Yamaha DX7 emulation library. The various functions available in this library
 // are used by the libraries generated from `.syx` DX7 preset files. This
@@ -56,6 +59,8 @@ ba = library("basics.lib");
 en = library("envelopes.lib");
 ma = library("maths.lib");
 os = library("oscillators.lib");
+
+declare version "1.1.0";
 
 //----------------------`(dx.)dx7_ampf`--------------------------
 // DX7 amplitude conversion function. 3 versions of this function

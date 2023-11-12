@@ -9,7 +9,7 @@
  **
  **
  **  USAGE:
- **        _:component("tubes.lib").model:_
+ **        _ : component("tubes.lib").model : _
  **  where
  **       model is on of the models above.
  **
@@ -24,6 +24,8 @@
  ******************************************************************************/
 
 fi = library("filters.lib");
+
+declare version "1.0.0";
 
 /*******************************************************************************
   * 1-dimensional function tables for linear interpolation
