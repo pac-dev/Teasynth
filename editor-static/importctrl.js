@@ -1,4 +1,15 @@
-// chrome://serviceworker-internals/
+/**
+ * This service worker does 2 things:
+ * - Serve back files from "builds" provided by the user. This allows
+ *   user-provided ES modules to import each other.
+ * - If PWA support is enabled when running `teasynth.js generate-editor`, this
+ *   also does typical PWA caching so the app can work offline.
+ * 
+ * For reference: chrome://serviceworker-internals/
+ */
+
+const cacheName = 'cache name gets generated here';
+const cachedPaths = [/*cached paths get generated here*/];
 
 if (!self.builds) self.builds = {};
 
@@ -10,8 +21,21 @@ const removeBuild = cmdData => {
 	delete self.builds[cmdData.buildId];
 };
 
-self.addEventListener('install', e => {
-	self.skipWaiting()
+self.addEventListener('install', (e) => {
+	e.waitUntil((async () => {
+		await self.skipWaiting();
+		const cache = await caches.open(cacheName);
+		await cache.addAll(cachedPaths);
+	})());
+});
+
+self.addEventListener('activate', (e) => {
+	e.waitUntil((async () => {
+		self.clients.claim();
+		for (const key of await caches.keys()) {
+			if (key !== cacheName) await caches.delete(key);
+		}
+	})());
 });
 
 addEventListener('message', event => {
@@ -39,5 +63,10 @@ self.addEventListener('fetch', e => {
 		e.respondWith(r);
 		return;
 	}
+	if (cachedPaths.length) e.respondWith(
+		caches.match(e.request).then(function(response) {
+			return response || fetch(e.request);
+		})
+	);
 });
 

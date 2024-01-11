@@ -59,7 +59,8 @@ const commandActions = {
 		serveEditor(config, teaDir);
 	},
 	'generate-editor': async args => {
-		console.log('Static host must be configured to serve /index.html as 404 page.');
+		console.log('Note: in order to support deeplinks (optional), '+
+			'the static host should be configured to serve /index.html as 404 page.');
 		const teaDir = path.dirname(path.fromFileUrl(import.meta.url));
 		const config = await readConfig(args, teaDir);
 		const outDir = args._[1];

@@ -1,0 +1,11 @@
+{
+	"name":"Teasynth",
+	"scope": ".",
+	"start_url": "./",
+	"display":"standalone",
+	"icons":[{
+		"src":"teasynth_t.svg",                     
+		"sizes":"192x192 512x512",
+		"type":"image/svg+xml"
+	}]
+}

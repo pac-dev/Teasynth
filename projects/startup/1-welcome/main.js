@@ -1,3 +1,13 @@
+/**  ______                       __  __
+ *  /_  __/__ ___ ____ __ _____  / /_/ /
+ *   / / / -_) _ `(_-</ // / _ \/ __/ _ \
+ *  /_/  \__/\_,_/___/\_, /_//_/\__/_//_/
+ *                   /___/
+ *     Audio Programming Environment
+ *           Served from CLI
+ */
+
+// example patch
 export const sampleRate = 44100;
 let t = 0;
 export const process = () => {

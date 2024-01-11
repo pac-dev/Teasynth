@@ -1,4 +1,6 @@
-import { serve, serveFile, copy, exists, path } from './deps.js';
+// Functions to generate or serve the Teasynth editor as a static website.
+
+import { serve, serveFile, copy, exists, walkSync, path } from './deps.js';
 import { path2proj } from './build.js';
 
 const join = path.join;
@@ -72,11 +74,18 @@ export const serveEditor = (config, teaDir) => {
 	serve(handler, { port: 8000 });
 };
 
+const replaceInFile = (filePath, search, replace) => {
+	let contents = Deno.readTextFileSync(filePath);
+	contents = contents.replace(search, replace);
+	Deno.writeTextFileSync(filePath, contents);
+};
+
 export const generateEditor = async (config, teaDir, outDir, yes) => {
 	await Deno.mkdir(outDir, { recursive: true });
 	await scaredCopy(join(teaDir, 'editor-static'), outDir, yes);
 	await scaredCopy(join(teaDir, 'editor-js'), join(outDir, 'editor-js'), yes);
 	await scaredCopy(join(teaDir, 'core'), join(outDir, 'core'), yes);
+	const versionStr = ' Version ' + new Date().toISOString().split('T')[0];
 	for (let [urlPath, srcPath] of Object.entries(config.projects)) {
 		if (!await exists(srcPath)) return console.log('Could not find ' + srcPath);
 		await Deno.mkdir(join(outDir, urlPath), { recursive: true });
@@ -89,6 +98,27 @@ export const generateEditor = async (config, teaDir, outDir, yes) => {
 			const answer = prompt('Write? (y/n)');
 			if (answer !== 'y') Deno.exit();
 		}
-		Deno.writeTextFileSync(dstPath, JSON.stringify(proj.toJsonObj()));
+		let projStr = JSON.stringify(proj.toJsonObj());
+		projStr = projStr.replace('  Served from CLI', versionStr);
+		Deno.writeTextFileSync(dstPath, projStr);
+	}
+	if (config.pwa) {
+		const paths = [];
+		for (const entry of walkSync(outDir)) {
+			if (!entry.isFile) continue;
+			let rel = path.relative(outDir, entry.path);
+			if (rel === 'index.html') rel = ''
+			if (path.sep !== '/') rel = rel.replaceAll(path.sep, '/');
+			paths.push('./' + rel);
+		}
+		const svcPath = join(outDir, 'importctrl.js');
+		const nameDummy = 'cache name gets generated here';
+		const pathsDummy = '[/*cached paths get generated here*/]';
+		const manifDummy = '<!-- manifest automatically inserted here -->';
+		replaceInFile(svcPath, nameDummy, 'teacache_'+Date.now());
+		replaceInFile(svcPath, pathsDummy, JSON.stringify(paths, null, ' '));
+		replaceInFile(join(outDir, 'index.html'), manifDummy, '<link rel="manifest" href="manifest.json">');
+	} else {
+		Deno.removeSync(join(outDir, 'manifest.json'));
 	}
 };
