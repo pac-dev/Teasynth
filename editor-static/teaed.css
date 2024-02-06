@@ -119,6 +119,9 @@ input.renamer.renaming {
 .file_item > .path {
 	padding: 0.3rem 0.6rem 0.3rem 1rem;
 	user-select: none;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	text-wrap: nowrap;
 }
 .filebtn {
 	display: none;

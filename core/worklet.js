@@ -109,6 +109,10 @@ export const makeWorklet = (mainUrl, hostUrl, processorName) => `
 			// performance.now is not available in worklets.
 			const t0 = Date.now();
 			const channels = outputs[0];
+			// Chrome 121+ initially calls process with 0 output channels (and 0 inputs)
+			// Perhaps it is a meditation on the emptiness of life's purpose.
+			// What can we do but return as if we had processed something?
+			if (!channels.length) return true;
 			for (let i=0; i<channels[0].length; i++) {
 				fillChannels(channels, i);
 			}
