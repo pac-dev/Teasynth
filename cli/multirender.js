@@ -1,4 +1,5 @@
 import { loadTrack } from './render.js';
+import { path } from './deps.js';
 
 const parseParamStr = (str) => Function(`"use strict"; return parseFloat(${str})`)();
 // Buffer size determines timing accuracy when tracks and parameters change.
@@ -96,8 +97,9 @@ export class MultiRenderer {
  */
 class TrackHandle {
 	constructor() {
+		const modulePath = path.fromFileUrl(import.meta.url);
 		const command = new Deno.Command(Deno.execPath(), {
-			args: ['run', '-A', '--unstable', 'teasynth.js', 'subprocess'],
+			args: ['run', '-A', '--unstable', modulePath],
 			stdin: 'piped', stdout: 'piped'
 		});
 		this.proc = command.spawn();
@@ -107,7 +109,11 @@ class TrackHandle {
 	async rpc(args) {
 		await this.writer.write(new TextEncoder().encode(JSON.stringify(args)));
 		const readResp = await this.reader.read();
-		if (readResp.done) throw new Error(`what do you mean you're done`);
+		if (readResp.done) throw new Error('\nA child process stopped responding. '
+			+ 'This could be due to:\n'
+			+ '\t- An error in the child process, which might not be output here.\n'
+			+ '\t  Try running the code in the browser version of Teasynth to debug.\n'
+			+ '\t- Possibly running out of memory. Try checking resource usage.\n');
 		return readResp.value;
 	}
 	async load(path, initParams) {
@@ -146,7 +152,7 @@ class TrackHandle {
 /**
  * Call this in child processes to load tracks and generate audio.
  */
-export const subprocess = async () => {
+const subprocess = async () => {
 	// In Deno, these console functions print to stdout by default. We're piping
 	// data through stdout, so this would cause problems (eg. "broken pipe").
 	// I'd also like to avoid idiosyncrasies like "never use console.log in
@@ -193,3 +199,7 @@ export const subprocess = async () => {
 		await fn(args);
 	}
 };
+
+if (import.meta.main) {
+	await subprocess();
+}

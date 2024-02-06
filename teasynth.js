@@ -2,8 +2,8 @@ import { parse, bold, cyan, path } from './cli/deps.js';
 import { loadTrack, parseParamArgs, createRenderer } from './cli/render.js';
 import { build } from './cli/build.js';
 import { readConfig, serveEditor, generateEditor } from './cli/editor.js';
-import { playUpToStamp, macroEvents } from './core/macro.js';
-import { MultiRenderer, subprocess } from './cli/multirender.js';
+import { MultiRenderer } from './cli/multirender.js';
+import { renderMacro } from './cli/rendermacro.js';
 
 const cmd = txt => cyan(bold(txt));
 
@@ -52,7 +52,7 @@ const commandActions = {
 		build({ inDir, outDir, wantTracks, faustOut });
 	},
 	'serve-editor': async args => {
-		console.log('Important: serve-editor is not suitable for public-facing servers!');
+		console.log('Note: serve-editor is not suitable for public-facing servers.');
 		console.log('Use generate-editor for publishing.');
 		const teaDir = path.dirname(path.fromFileUrl(import.meta.url));
 		const config = await readConfig(args, teaDir);
@@ -69,45 +69,9 @@ const commandActions = {
 	async macro(args) {
 		if (args._.length !== 4) helpAndExit();
 		console.time('macro rendering time');
-		const content = await Deno.readTextFile('./' + args._[2]);
-		const lines = content.split('\n');
-		const r = new MultiRenderer();
-
-		// i think the web version reuses params from oldTrack
-		// todo make this more consistent between versions
-		macroEvents.startTrack = (trackName, params, oldTrack) => {
-			const paramObj = {};
-			for (const p of params) paramObj[p.name] = p.valStr;
-			const mainPath = path.join(args._[1], trackName, 'main.js');
-			return r.addTrack(mainPath, paramObj);
-		};
-		macroEvents.tweakTrack = (cmdTrack, param) => {
-			if (!cmdTrack) throw new Error('no such track.');
-			r.tweakTrack(cmdTrack, { [param.name]: param.valStr });
-		};
-		macroEvents.stopTrack = (cmdTrack) => {
-			if (!cmdTrack) throw new Error('no such track.');
-			r.removeTrack(cmdTrack);
-		};
-		macroEvents.setHighlight = (file, lineNum) => {
-			console.log(lines[lineNum-1]);
-		};
-		console.log('rendering...');
-		const outHandle = await r.addOutput(args._[3]);
-		let nowStamp = 0;
-		while (true) {
-			const nextStamp = playUpToStamp(content, nowStamp);
-			if (nextStamp === Number.MAX_VALUE) {
-				await r.removeOutput(outHandle);
-				break;
-			}
-			await r.render((nextStamp - nowStamp)/1000);
-			nowStamp = nextStamp;
-		}
-		await r.finalize();
+		await renderMacro(args._[1], args._[2], args._[3])
 		console.timeEnd('macro rendering time');
-	},
-	subprocess
+	}
 };
 
 if (import.meta.main) {
@@ -117,4 +81,4 @@ if (import.meta.main) {
 	else helpAndExit();
 }
 
-export { loadTrack, parseParamArgs, createRenderer, build };
+export { loadTrack, parseParamArgs, createRenderer, build, MultiRenderer, renderMacro };

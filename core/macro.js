@@ -85,7 +85,7 @@ const play = (f) => {
 	tgtFile = f;
 	startDate = new Date();
 	if (startStamp) playingLine = findStampLine(startStamp);
-	else playingLine = 0;
+	else playingLine = -1;
 	status = 'playing';
 	playUsingTimer();
 };
@@ -124,6 +124,8 @@ const stop = () => {
 	tgtFile = undefined;
 	instances.length = 0;
 };
+
+export const offlineInit = () => { playingLine = -1 };
 
 /** @param {Instance} search  */
 const getInstance = (search) => instances.find(
