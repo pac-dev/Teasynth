@@ -24,6 +24,9 @@ export class MultiRenderer {
 		this.controlTasks = [];
 		this.mixBuf = new Float32Array(bufFrames*2);
 		this.mixView = new Uint8Array(this.mixBuf.buffer);
+		this.stageBuf = new Float32Array(bufFrames*2);
+		this.stageView = new Uint8Array(this.stageBuf.buffer);
+		this.position = 0;
 	}
 	async addOutput(outPath) {
 		console.log('adding output: '+outPath);
@@ -31,7 +34,8 @@ export class MultiRenderer {
 		const cmd = ['ffmpeg', '-y', '-f', 'f32le', '-channels', '2', '-i', 'pipe:0'];
 		if (ext === 'mp3') cmd.push('-b:a', '192k');
 		cmd.push(outPath);
-		const outHandle = Deno.run({ cmd, stdin: 'piped', stderr: 'piped' });
+		const outHandle = Deno.run({ cmd, stdin: 'piped', stderr: 'null' });
+		outHandle.mixFn = null;
 		this.outHandles.add(outHandle);
 		return outHandle;
 	}
@@ -66,23 +70,36 @@ export class MultiRenderer {
 		});
 	};
 	/** @param {Number} dur - duration to render in seconds */
-	async render(dur) {
+	async render(dur, { stopAtSplicePoint=false } = {}) {
 		// Parallel version doesn't work:
 		// await Promise.all(this.controlTasks.map(task => task()));
 		// Fully sequential version works:
 		for (const task of this.controlTasks) await task();
 		// (a good compromise might be sequential per process)
 		this.controlTasks.length = 0;
+		let splicePoint = false;
 		for (let i=0; i<dur*sr/bufFrames; i++) {
 			for (let j=0; j<bufFrames*2; j++) this.mixBuf[j] = 0;
 			const renderProms = [...this.trackHandles].map(async (trackHandle) => {
-				const block = await trackHandle.process();
+				let block = await trackHandle.process();
+				if (block.every(x => x === -1)) {
+					splicePoint = true;
+					block = await trackHandle.process();
+				}
+				if (block.every(x => x === -1)) throw new Error('MORE -1?')
 				for (let j=0; j<bufFrames*2; j++) this.mixBuf[j] += block[j];
 			});
 			await Promise.all(renderProms);
 			for (const outHandle of this.outHandles) {
-				await outHandle.stdin.write(this.mixView);
+				if (outHandle.mixFn) {
+					this.mixBuf.forEach((x,i) => this.stageBuf[i] = outHandle.mixFn(x, this.position));
+					await outHandle.stdin.write(this.stageView);
+				} else {
+					await outHandle.stdin.write(this.mixView);
+				}
 			}
+			this.position += bufFrames/sr;
+			if (stopAtSplicePoint && splicePoint) return;
 		}
 	}
 	async finalize() {
@@ -175,6 +192,11 @@ const subprocess = async () => {
 			await Deno.stdout.write(new TextEncoder().encode('ok'));
 		},
 		async process() {
+			if (track.host.splicePoint) {
+				delete track.host.splicePoint;
+				outBuf.fill(-1);
+				return await stdWriter.write(outView);
+			}
 			for (let i=0; i<bufFrames; i++) {
 				if (!(i % 128)) {
 					// This yields control to the event loop, forcing the entire
