@@ -1,14 +1,14 @@
 import { compileFaust } from '../core/faustCompiler.js';
 import { makeWorklet } from '../core/worklet.js';
-import { createTrack, removeTrack } from '../core/player.js';
+import { createPatch, removePatch } from '../core/player.js';
 
 /** @type {ServiceWorker} */
 let service;
 let urlBase;
 
-/** @type {Array.<DevTrack>} */
-export const devTracks = [];
-window.devTracks = devTracks;
+/** @type {Array.<DevPatch>} */
+export const devPatches = [];
+window.devPatches = devPatches;
 
 export const parseParamStr = (str) => Function(`"use strict"; return parseFloat(${str})`)();
 
@@ -45,7 +45,7 @@ export const initService = async _urlBase => {
 	console.log('Service worker ready');
 };
 
-export class DevTrack {
+export class DevPatch {
 	/**
 	 * @param {import('../core/project.js').Project} proj 
 	 * @param {import('../core/project.js').ProjFile} main 
@@ -57,7 +57,7 @@ export class DevTrack {
 		/** @type {('playing'|'loading'|'stopped'|'linked')} */
 		this.status = 'stopped';
 		this.params = [];
-		devTracks.push(this);
+		devPatches.push(this);
 	}
 	async pushBuild() {
 		if (!service) throw new Error('Service worker not ready.');
@@ -88,11 +88,11 @@ export class DevTrack {
 		const initParams = Object.fromEntries(this.params.map(p => 
 			[p.name, typeof p.val === 'number' ? p.val : parseParamStr(p.val)]
 		));
-		this.track = await createTrack({url: shimUrl, processorName, callbacks, initParams});
+		this.patch = await createPatch({url: shimUrl, processorName, callbacks, initParams});
 		const oldParams = this.params;
-		// old/init params are kept by the track unless they are out of bounds
+		// old/init params are kept by the patch unless they are out of bounds
 		// note that the type (text or number/slider) may have changed
-		this.params = this.track.paramSpecs.map(spec => {
+		this.params = this.patch.paramSpecs.map(spec => {
 			let val = spec.def;
 			let valStr = spec.defStr;
 			const old = oldParams.find(p => p.name === spec.name);
@@ -123,9 +123,9 @@ export class DevTrack {
 			await serviceCommand({type: 'removeBuild', buildId: this.buildId});
 			this.buildId = undefined;
 		}
-		if (this.track) {
-			removeTrack(this.track, false);
-			this.track = undefined;
+		if (this.patch) {
+			removePatch(this.patch, false);
+			this.patch = undefined;
 		}
 		this.status = 'stopped';
 	}

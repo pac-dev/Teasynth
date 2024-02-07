@@ -216,7 +216,7 @@ input.renamer.renaming {
     white-space: nowrap;
     max-width: calc(100% - 10rem);
 }
-.params_track {
+.params_patch {
 	background-color: #c5c5de;
 	margin: 1rem;
 	display: inline-block;

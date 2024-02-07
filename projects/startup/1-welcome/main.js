@@ -7,20 +7,23 @@
  *           Served from CLI
  */
 
-// example patch
+// Example sound patch. A patch can impose its own samplerate:
 export const sampleRate = 44100;
 let t = 0;
+
+// "process" is called once per audio frame:
 export const process = () => {
-	// oscillator at 300Hz:
+	// Oscillator at 300Hz:
 	let ret = Math.sin(t * 300 * Math.PI * 2);
-	// modulation at 200Hz:
+	// Modulation at 200Hz:
 	ret *= Math.sin(t * 200 * Math.PI * 2);
-	// polyrhythm:
+	// Polyrhythm:
 	for (let i = 1; i < 6; i++) {
 		ret *= Math.sqrt(1 + (-6 * t / i) % 1);
 	}
-	// distortion:
+	// Distortion:
 	ret = Math.tanh(ret * 5);
+	// Imprecise but simple way of counting time:
 	t += 1 / sampleRate;
 	return [ret, ret];
 };

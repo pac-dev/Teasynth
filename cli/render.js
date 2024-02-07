@@ -17,11 +17,11 @@ const importFile = async (filePath, bustCache) => {
 };
 
 /**
- * Load a teasynth track. Note that you can only have a single track loaded at a
- * time. Once you switch tracks, you can't go back to the previous one. Using
+ * Load a teasynth patch. Note that you can only have a single patch loaded at a
+ * time. Once you switch patches, you can't go back to the previous one. Using
  * multiple threads or processes is currenly the only way around this.
  */
-export const loadTrack = async mainPath => {
+export const loadPatch = async mainPath => {
 	const hostPath = await findHostPath(mainPath);
 	if (!hostPath) throw new Error('could not find host.js');
 	const hostMod = await importFile(hostPath);
@@ -67,7 +67,7 @@ const copyAmp = (src, tgt, amp) => {
 	}
 };
 
-export const createRenderer = (track) => {
+export const createRenderer = (patch) => {
 	const bufFrames = 2048;
 	const sr = 44100;
 	const buf = new Float32Array(bufFrames*2);
@@ -95,7 +95,7 @@ export const createRenderer = (track) => {
 		async render(dur) {
 			for (let i=0; i<dur*sr/bufFrames; i++) {
 				for (let j=0; j<bufFrames; j++) {
-					[buf[j*2], buf[j*2+1]] = track.process();
+					[buf[j*2], buf[j*2+1]] = patch.process();
 				}
 				for (let p of pipes) {
 					if (p.xf) {
@@ -105,8 +105,8 @@ export const createRenderer = (track) => {
 						await p.stdin.write(bufView);
 					}
 				}
-				if (track.host.wantInterrupt) {
-					delete track.host.wantInterrupt;
+				if (patch.host.wantInterrupt) {
+					delete patch.host.wantInterrupt;
 					break;
 				}
 			}

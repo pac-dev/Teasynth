@@ -1,25 +1,25 @@
-import { loadTrack } from './render.js';
+import { loadPatch } from './render.js';
 import { path } from './deps.js';
 
 const parseParamStr = (str) => Function(`"use strict"; return parseFloat(${str})`)();
-// Buffer size determines timing accuracy when tracks and parameters change.
+// Buffer size determines timing accuracy when patches and parameters change.
 const bufFrames = 1024;
 const bufBytes = bufFrames*2*4; // stereo*(float32/byte)
 const sr = 44100;
 
 /**
  * Teasynth multi-track renderer based on starting a new subprocess for each
- * track. Offers a simple API to add and remove tracks and output audio files.
+ * patch. Offers a simple API to add and remove patches and output audio files.
  * 
- * The main reason for this architecture is that it's otherwise
- * impossible to free up memory used by tracks. It also allows modules to be
- * loaded multiple times and keep individual global state if they wish (though
- * that could also be done using workers.)
+ * The main reason for this architecture is that it's otherwise impossible to
+ * free up memory used by patches. It also allows modules to be loaded multiple
+ * times and keep individual global state if they wish (though that could also
+ * be done using workers.)
  */
 export class MultiRenderer {
 	constructor() {
-		/** @type {Set.<TrackHandle>} */
-		this.trackHandles = new Set();
+		/** @type {Set.<PatchHandle>} */
+		this.patchHandles = new Set();
 		this.outHandles = new Set();
 		this.controlTasks = [];
 		this.mixBuf = new Float32Array(bufFrames*2);
@@ -46,27 +46,27 @@ export class MultiRenderer {
 		outHandle.close();
 		this.outHandles.delete(outHandle);
 	}
-	addTrack(path, params) {
+	addPatch(path, params) {
 		const parsedParams = {};
 		for (const [k,v] of Object.entries(params)) parsedParams[k] = parseParamStr(v);
-		const trackHandle = new TrackHandle();
+		const patchHandle = new PatchHandle();
 		this.controlTasks.push(async () => {
-			await trackHandle.load(path, parsedParams);
+			await patchHandle.load(path, parsedParams);
 		});
-		this.trackHandles.add(trackHandle);
-		return trackHandle;
+		this.patchHandles.add(patchHandle);
+		return patchHandle;
 	};
-	removeTrack(trackHandle) {
+	removePatch(patchHandle) {
 		this.controlTasks.push(async () => {
-			await trackHandle.exit();
+			await patchHandle.exit();
 		});
-		this.trackHandles.delete(trackHandle);
+		this.patchHandles.delete(patchHandle);
 	};
-	tweakTrack(trackHandle, params) {
+	tweakPatch(patchHandle, params) {
 		const parsedParams = {};
 		for (const [k,v] of Object.entries(params)) parsedParams[k] = parseParamStr(v);
 		this.controlTasks.push(async () => {
-			await trackHandle.tweak(parsedParams);
+			await patchHandle.tweak(parsedParams);
 		});
 	};
 	/** @param {Number} dur - duration to render in seconds */
@@ -80,11 +80,11 @@ export class MultiRenderer {
 		let splicePoint = false;
 		for (let i=0; i<dur*sr/bufFrames; i++) {
 			for (let j=0; j<bufFrames*2; j++) this.mixBuf[j] = 0;
-			const renderProms = [...this.trackHandles].map(async (trackHandle) => {
-				let block = await trackHandle.process();
+			const renderProms = [...this.patchHandles].map(async (patchHandle) => {
+				let block = await patchHandle.process();
 				if (block.every(x => x === -1)) {
 					splicePoint = true;
-					block = await trackHandle.process();
+					block = await patchHandle.process();
 				}
 				if (block.every(x => x === -1)) throw new Error('MORE -1?')
 				for (let j=0; j<bufFrames*2; j++) this.mixBuf[j] += block[j];
@@ -104,15 +104,15 @@ export class MultiRenderer {
 	}
 	async finalize() {
 		for (const task of this.controlTasks) await task();
-		const n = this.trackHandles.size;
-		if (n) console.log(`Rendering done but ${n} tracks still in playing state!`)
+		const n = this.patchHandles.size;
+		if (n) console.log(`Rendering done but ${n} patches still in playing state!`)
 	}
 }
 
 /**
  * Helper class to start and communicate with child processes.
  */
-class TrackHandle {
+class PatchHandle {
 	constructor() {
 		const modulePath = path.fromFileUrl(import.meta.url);
 		const command = new Deno.Command(Deno.execPath(), {
@@ -167,7 +167,7 @@ class TrackHandle {
 }
 
 /**
- * Call this in child processes to load tracks and generate audio.
+ * Call this in child processes to load patches and generate audio.
  */
 const subprocess = async () => {
 	// In Deno, these console functions print to stdout by default. We're piping
@@ -181,19 +181,19 @@ const subprocess = async () => {
 	const outBuf = new Float32Array(bufFrames*2);
 	const outView = new Uint8Array(outBuf.buffer);
 	const stdWriter = Deno.stdout.writable.getWriter();
-	let track;
+	let patch;
 	const fns = {
 		async load({ path }) {
-			track = await loadTrack(path);
+			patch = await loadPatch(path);
 			await Deno.stdout.write(new TextEncoder().encode('ok'));
 		},
 		async set({ params }) {
-			track.setParams(params);
+			patch.setParams(params);
 			await Deno.stdout.write(new TextEncoder().encode('ok'));
 		},
 		async process() {
-			if (track.host.splicePoint) {
-				delete track.host.splicePoint;
+			if (patch.host.splicePoint) {
+				delete patch.host.splicePoint;
 				outBuf.fill(-1);
 				return await stdWriter.write(outView);
 			}
@@ -204,9 +204,9 @@ const subprocess = async () => {
 					// happens between audio blocks in the browser environment.
 					await new Promise((resolve) => setTimeout(resolve));
 					// alternatively we could use several "await null" here,
-					// which is 1-5% faster for tracks but more precarious.
+					// which is 1-5% faster for patches but more precarious.
 				}
-				[outBuf[i*2], outBuf[i*2+1]] = track.process();
+				[outBuf[i*2], outBuf[i*2+1]] = patch.process();
 			}
 			await stdWriter.write(outView);
 		},

@@ -1,5 +1,5 @@
 import { parse, bold, cyan, path } from './cli/deps.js';
-import { loadTrack, parseParamArgs, createRenderer } from './cli/render.js';
+import { loadPatch, parseParamArgs, createRenderer } from './cli/render.js';
 import { build } from './cli/build.js';
 import { readConfig, serveEditor, generateEditor } from './cli/editor.js';
 import { MultiRenderer } from './cli/multirender.js';
@@ -14,10 +14,10 @@ Otherwise, use: ${cmd('deno run -A --unstable teasynth.js')}
 
 Subcommands:
 
-  ${cmd('render')}: Render a track to an audio file.
+  ${cmd('render')}: Render a patch to an audio file.
     Usage: ${cmd('teasynth render MAINFILE OUTFILE [-t DURATION] [-p-PARAM X ...]')}
-  ${cmd('build')}: Build tracks from a project into js+wasm bundles.
-    Usage: ${cmd('teasynth build PROJDIR OUTDIR [--track NAME]')}
+  ${cmd('build')}: Build patches from a project into js+wasm bundles.
+    Usage: ${cmd('teasynth build PROJDIR OUTDIR [--patch NAME]')}
   ${cmd('serve-editor')}: Serve the Teasynth web editor locally.
     Usage: ${cmd('teasynth serve-editor [--config FILE]')}
   ${cmd('generate-editor')}: Generate the Teasynth editor static website for deployment.
@@ -35,9 +35,9 @@ const commandActions = {
 	async render(args) {
 		if (args._.length !== 3) helpAndExit();
 		const dur = args.t ?? 10;
-		const track = await loadTrack('./' + args._[1]);
-		track.setParams(parseParamArgs(args));
-		const r = createRenderer(track);
+		const patch = await loadPatch('./' + args._[1]);
+		patch.setParams(parseParamArgs(args));
+		const r = createRenderer(patch);
 		console.log('rendering...');
 		const pipe = await r.addOutput(args._[2]);
 		await r.render(dur);
@@ -46,10 +46,10 @@ const commandActions = {
 	async build(args) {
 		if (args._.length !== 3) helpAndExit();
 		const outDir = args._[2] + '/';
-		const wantTracks = ('t' in args) ? [].concat(args['t']) : [];
+		const wantPatches = ('t' in args) ? [].concat(args['t']) : [];
 		const faustOut = args['faust-out'] ? args['faust-out'] + '/' : undefined;
 		const inDir = args._[1];
-		build({ inDir, outDir, wantTracks, faustOut });
+		build({ inDir, outDir, wantPatches, faustOut });
 	},
 	'serve-editor': async args => {
 		console.log('Note: serve-editor is not suitable for public-facing servers.');
@@ -81,4 +81,4 @@ if (import.meta.main) {
 	else helpAndExit();
 }
 
-export { loadTrack, parseParamArgs, createRenderer, build, MultiRenderer, renderMacro };
+export { loadPatch, parseParamArgs, createRenderer, build, MultiRenderer, renderMacro };

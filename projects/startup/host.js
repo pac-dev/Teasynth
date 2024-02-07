@@ -11,7 +11,7 @@
  */
 
 /**
- * Each track is played by a host. It could be a web player, another track,
+ * Each patch is played by a host. It could be a web player, another patch,
  * or a command line player.
  *
  * @typedef { Object } Host
@@ -52,7 +52,7 @@
  */
 
 /**
- * Normal track init.
+ * Normal patch init.
  *
  * @async
  * @function

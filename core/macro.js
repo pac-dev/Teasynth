@@ -21,7 +21,7 @@
  * @typedef {Object} MacroEvent
  * @property {('start'|'stop'|'tweak')} type
  * @property {number?} stamp
- * @property {string?} trackName
+ * @property {string?} patchName
  * @property {number?} instance
  * @property {Array<Object>?} params
  * @property {Array<ParamChange>?} paramChanges
@@ -29,9 +29,9 @@
 
 /**
  * @typedef {Object} Instance
- * @property {string} trackName
- * @property {number} trackInstance
- * @property {import('../editor-js/devPlayer.js').DevTrack} devTrack
+ * @property {string} patchName
+ * @property {number} patchInstance
+ * @property {import('../editor-js/devPlayer.js').DevPatch} devPatch
  */
 
 /** @type {import('./project.js').ProjFile} */
@@ -90,7 +90,7 @@ const play = (f) => {
 	playUsingTimer();
 };
 
-// Pause recording or playing (this does not pause the tracks)
+// Pause recording or playing (this does not pause the patches)
 const pause = () => {
 	if (status !== 'playing' && status !== 'recording') return;
 	if (status === 'recording') checkStreak(true);
@@ -132,13 +132,13 @@ const getInstance = (search) => instances.find(
 	i => Object.entries(search).every(([k,v]) => i[k] === v)
 );
 
-const setInstance = (trackName, trackInstance, devTrack) => {
-	const oldi1 = instances.findIndex(i => i.trackName === trackName && i.trackInstance === trackInstance);
+const setInstance = (patchName, patchInstance, devPatch) => {
+	const oldi1 = instances.findIndex(i => i.patchName === patchName && i.patchInstance === patchInstance);
 	if (oldi1 !== -1) instances.splice(oldi1, 1);
-	const oldi2 = instances.findIndex(i => i.devTrack === devTrack);
+	const oldi2 = instances.findIndex(i => i.devPatch === devPatch);
 	if (oldi2 !== -1) instances.splice(oldi2, 1);
-	if (oldi1 !== -1 || oldi2 !== -1) console.log(`overwriting instance ${trackName} #${trackInstance}`);
-	instances.push({ trackName, trackInstance, devTrack });
+	if (oldi1 !== -1 || oldi2 !== -1) console.log(`overwriting instance ${patchName} #${patchInstance}`);
+	instances.push({ patchName, patchInstance, devPatch });
 };
 
 /** @param {Array<ParamChange>} paramChanges */
@@ -150,7 +150,7 @@ const serializeValues = (paramChanges) => {
 
 /** @param {MacroEvent} event */
 const serialize = (event) => {
-	let ret = `${event.type} ${event.trackName}`;
+	let ret = `${event.type} ${event.patchName}`;
 	if (event.instance !== 1) ret += ' #' + event.instance;
 	ret += '. ';
 	if (!event.paramChanges) return ret;
@@ -182,7 +182,7 @@ let intervalId = -1, timeoutId = -1;
 const isStreak = (e1, e2) => {
 	return (
 		e1.paramChanges[0].param === e2.paramChanges[0].param
-		&& e1.trackName === e2.trackName
+		&& e1.patchName === e2.patchName
 		&& e1.instance === e2.instance
 	);
 };
@@ -216,20 +216,20 @@ const checkStreak = (force=false) => {
 
 /**
  * @param {MacroEvent} event 
- * @param {import('../editor-js/devPlayer.js').DevTrack} devTrack 
+ * @param {import('../editor-js/devPlayer.js').DevPatch} devPatch 
  */
-const recEvent = (event, devTrack) => {
+const recEvent = (event, devPatch) => {
 	if (status !== 'recording') return;
 	if (!tgtFile.content.length) startDate = new Date();
 	event.stamp = getCurrentStamp();
-	event.trackName = devTrack.name;
-	if (!getInstance({ devTrack })) {
-		const i = instances.filter(i => i.trackName === event.trackName).length;
-		setInstance(event.trackName, i + 1, devTrack);
+	event.patchName = devPatch.name;
+	if (!getInstance({ devPatch })) {
+		const i = instances.filter(i => i.patchName === event.patchName).length;
+		setInstance(event.patchName, i + 1, devPatch);
 	}
-	event.instance = getInstance({ devTrack }).trackInstance;
+	event.instance = getInstance({ devPatch }).patchInstance;
 	if (event.type === 'start') {
-		event.paramChanges = devTrack.params.map(param2paramChange);
+		event.paramChanges = devPatch.params.map(param2paramChange);
 	}
 	if (event.type === 'tweak') {
 		event.paramChanges = event.params.map(param2paramChange);
@@ -280,7 +280,7 @@ let backlog = [];
 const playBacklog = (playStamp) => {
 	const playNow = backlog.filter(e => e.stamp <= playStamp);
 	backlog = backlog.filter(e => e.stamp > playStamp);
-	for (const e of playNow) macroEvents.tweakTrack(e.devTrack, e);
+	for (const e of playNow) macroEvents.tweakPatch(e.devPatch, e);
 	if (!backlog.length) return Number.MAX_VALUE;
 	return Math.min(...backlog.map(e => e.stamp));
 };
@@ -307,10 +307,10 @@ const playLines = (content, playStamp) => {
 const playLine = (line) => {
 	const [lineStamp, command] = extractStamp(line);
 	const [head, body] = (command+' ').split('. ').map(s => s.trim());
-	const [type, trackName, instanceStr] = head.split(' ');
-	const trackInstance = instanceStr ? Number(instanceStr.replace(/^#/, '')) : 1;
-	const devTrack = getInstance({ trackName, trackInstance })?.devTrack;
-	if (!type || !trackName) throw new Error(
+	const [type, patchName, instanceStr] = head.split(' ');
+	const patchInstance = instanceStr ? Number(instanceStr.replace(/^#/, '')) : 1;
+	const devPatch = getInstance({ patchName, patchInstance })?.devPatch;
+	if (!type || !patchName) throw new Error(
 		file.name+` line ${n}: Error parsing event: `+command
 	);
 	if (type === 'start') {
@@ -318,20 +318,20 @@ const playLine = (line) => {
 			const [name, valStr] = s.split(':').map(s => s.trim());
 			return { name, valStr };
 		});
-		const newDevTrack = macroEvents.startTrack(trackName, params, devTrack);
-		if (newDevTrack !== devTrack) setInstance(trackName, trackInstance, newDevTrack);
+		const newDevPatch = macroEvents.startPatch(patchName, params, devPatch);
+		if (newDevPatch !== devPatch) setInstance(patchName, patchInstance, newDevPatch);
 	} else if (type === 'stop') {
-		macroEvents.stopTrack(devTrack);
+		macroEvents.stopPatch(devPatch);
 	} else if (type === 'tweak') {
 		for (const paramStr of body.split(';')) {
 			const [name, tail] = paramStr.split(':').map(s => s.trim());
 			const changeStrs = tail.split(',');
 			if (changeStrs.length === 1) {
-				macroEvents.tweakTrack(devTrack, { name, valStr: tail.trim() });
+				macroEvents.tweakPatch(devPatch, { name, valStr: tail.trim() });
 			} else {
 				backlog.push(...changeStrs.map(s => {
 					const [offset, valStr] = s.split('=').map(s => s.trim());
-					return { devTrack, name, valStr, stamp: lineStamp+Number(offset)*1000 };
+					return { devPatch, name, valStr, stamp: lineStamp+Number(offset)*1000 };
 				}));
 			}
 		}
@@ -343,9 +343,9 @@ export const macroEvents = {
 	fileChanged: () => {},
 	// called when the status changed internally (eg. end of playback)
 	statusChanged: () => {},
-	startTrack: (trackName, params, devTrack) => {},
-	stopTrack: (devTrack) => {},
-	tweakTrack: (devTrack, param) => {},
+	startPatch: (patchName, params, devPatch) => {},
+	stopPatch: (devPatch) => {},
+	tweakPatch: (devPatch, param) => {},
 	setHighlight: (file, startLine, endLine) => {},
 };
 

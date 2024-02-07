@@ -8,21 +8,21 @@ export const renderMacro = async (projDir, macroPath, outPath) => {
     const lines = content.split('\n');
     const r = new MultiRenderer();
 
-    // i think the web version reuses params from oldTrack
+    // i think the web version reuses params from oldPatch
     // todo make this more consistent between versions
-    macroEvents.startTrack = (trackName, params, oldTrack) => {
+    macroEvents.startPatch = (patchName, params, oldPatch) => {
         const paramObj = {};
         for (const p of params) paramObj[p.name] = p.valStr;
-        const mainPath = path.join(projDir, trackName, 'main.js');
-        return r.addTrack(mainPath, paramObj);
+        const mainPath = path.join(projDir, patchName, 'main.js');
+        return r.addPatch(mainPath, paramObj);
     };
-    macroEvents.tweakTrack = (cmdTrack, param) => {
-        if (!cmdTrack) throw new Error('no such track.');
-        r.tweakTrack(cmdTrack, { [param.name]: param.valStr });
+    macroEvents.tweakPatch = (cmdPatch, param) => {
+        if (!cmdPatch) throw new Error('no such patch.');
+        r.tweakPatch(cmdPatch, { [param.name]: param.valStr });
     };
-    macroEvents.stopTrack = (cmdTrack) => {
-        if (!cmdTrack) throw new Error('no such track.');
-        r.removeTrack(cmdTrack);
+    macroEvents.stopPatch = (cmdPatch) => {
+        if (!cmdPatch) throw new Error('no such patch.');
+        r.removePatch(cmdPatch);
     };
     macroEvents.setHighlight = (file, lineNum) => {
         console.log(lines[lineNum-1]);

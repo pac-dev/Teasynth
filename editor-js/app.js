@@ -1,7 +1,7 @@
 import { CodeEditor } from './codeEditor.js';
 import { m } from './lib/mithrilModule.js';
 import { ProjDir, Project, ProjFile } from '../core/project.js';
-import { initService, DevTrack, devTracks, parseParamStr } from './devPlayer.js';
+import { initService, DevPatch, devPatches, parseParamStr } from './devPlayer.js';
 import { fsOpen, fsSave, fsSaveAs, canSave } from './fsa.js';
 import { macroEvents, macros, macroStatus } from '../core/macro.js';
 
@@ -11,26 +11,26 @@ let editingFile = proj.getDefaultMain();
 let lastMain = editingFile;
 let minimized = false;
 macroEvents.fileChanged = () => { editor.updateFiles() };
-macroEvents.startTrack = (trackName, params, devTrack) => {
-	devTrack ??= new DevTrack(proj, trackName2File(trackName));
+macroEvents.startPatch = (patchName, params, devPatch) => {
+	devPatch ??= new DevPatch(proj, patchName2File(patchName));
 	params.forEach(p => { p.val = parseParamStr(p.valStr); });
-	devTrack.params = params;
+	devPatch.params = params;
 	(async () => {
-		await devTrack.play();
+		await devPatch.play();
 		m.redraw();
 	})();
-	return devTrack;
+	return devPatch;
 };
-macroEvents.tweakTrack = (devTrack, param) => {
+macroEvents.tweakPatch = (devPatch, param) => {
 	param.val = parseParamStr(param.valStr);
-	devTrack.track.setParam(param.name, param.val);
-	const oldParam = devTrack.params.find(p => p.name === param.name);
+	devPatch.patch.setParam(param.name, param.val);
+	const oldParam = devPatch.params.find(p => p.name === param.name);
 	if (oldParam) oldParam.val = param.val;
 	if (oldParam && oldParam.valStr) oldParam.valStr = param.valStr;
 	m.redraw();
 };
-macroEvents.stopTrack = async (devTrack) => {
-	await devTrack.stop();
+macroEvents.stopPatch = async (devPatch) => {
+	await devPatch.stop();
 	m.redraw();
 };
 macroEvents.statusChanged = () => m.redraw();
@@ -41,11 +41,11 @@ const playCurrent = async ({override=true}={}) => {
 	if (!main) main = lastMain;
 	if (!proj.includes(main)) throw new Error('No main file to play.');
 	lastMain = main;
-	let devTrack;
-	if (override) devTrack = devTracks.findLast(dt => dt.main === main);
-	if (!devTrack) devTrack = new DevTrack(proj, main);
-	macros.recEvent({ type: 'start' }, devTrack);
-	await devTrack.play();
+	let devPatch;
+	if (override) devPatch = devPatches.findLast(dp => dp.main === main);
+	if (!devPatch) devPatch = new DevPatch(proj, main);
+	macros.recEvent({ type: 'start' }, devPatch);
+	await devPatch.play();
 	m.redraw();
 };
 const showParams = async () => {
@@ -53,14 +53,14 @@ const showParams = async () => {
 	if (!main) main = lastMain;
 	if (!proj.includes(main)) throw new Error('No main file to play.');
 	lastMain = main;
-	const devTrack = new DevTrack(proj, main);
-	await devTrack.scanParams();
+	const devPatch = new DevPatch(proj, main);
+	await devPatch.scanParams();
 	m.redraw();
 };
 const stopAll = async () => {
-	for (let dt of devTracks) {
-		await dt.stop();
-		macros.recEvent({ type: 'stop' }, dt);
+	for (let dp of devPatches) {
+		await dp.stop();
+		macros.recEvent({ type: 'stop' }, dp);
 	}
 	m.redraw();
 };
@@ -98,14 +98,14 @@ editor.addShortcut('Alt+Digit4', 'Teasynth: Next File', () => {
 editor.addShortcut('Alt+Digit5', 'Teasynth: Play Line', () => {
 	macros.playLine(editingFile.content.split('\n')[editor.editor.getPosition().lineNumber-1]);
 });
-const trackName2File = (name) => {
+const patchName2File = (name) => {
 	const file = proj.findByPath(name);
 	if (!file) return;
 	else if (file.isDir) return file.findChild('main.js');
 	else return file;
 };
-const goToTrackName = trackName => {
-	const file = trackName2File(trackName);
+const goToPatchName = patchName => {
+	const file = patchName2File(patchName);
 	if (!file) return false;
 	editingFile = file;
 	editingFile.openAncestors();
@@ -127,11 +127,11 @@ const parseUrlFragment = () => {
 	return ret;
 };
 const applyUrlFragment = parsedFragment => {
-	goToTrackName(parsedFragment.filePath);
+	goToPatchName(parsedFragment.filePath);
 	const main = editingFile.closestMain;
-	const dt = new DevTrack(proj, main);
-	dt.params = parsedFragment.params;
-	dt.status = 'linked';
+	const dp = new DevPatch(proj, main);
+	dp.params = parsedFragment.params;
+	dp.status = 'linked';
 };
 window.addEventListener('hashchange', () => {
 	applyUrlFragment(parseUrlFragment());
@@ -141,10 +141,10 @@ window.addEventListener('hashchange', () => {
 /** @param {Project} proj */
 const setProject = (proj, filePath = '') => {
 	stopAll();
-	devTracks.length = 0;
+	devPatches.length = 0;
 	editor.setProject(proj);
 	proj.root.collapseDescendants();
-	if (!goToTrackName(filePath)) goToTrackName(proj.getDefaultMain().path);
+	if (!goToPatchName(filePath)) goToPatchName(proj.getDefaultMain().path);
 };
 const staticUrl = new URL(window.tsStaticUrl, document.baseURI).href;
 const projectUrl = new URL(window.tsProjectUrl, document.baseURI).href;
@@ -331,7 +331,7 @@ let experimentalWarning = `Live compilation and playback is an experimental feat
 Open your browser's Javascript console (F12) to see compilation output.`;
 if (window.location.host.includes('localhost')) experimentalWarning = undefined;
 
-const viewTracks = () => devTracks.filter(dt => dt.status === 'playing' || dt.params.length);
+const viewPatches = () => devPatches.filter(dp => dp.status === 'playing' || dp.params.length);
 
 const macroRec = () => m('.tool.macro', { onclick: () => macros.rec(editingFile) }, 'm-rec');
 const macroPlay = () => m('.tool.macro', { onclick: () => macros.play(editingFile) }, 'm-play');
@@ -383,7 +383,7 @@ const Tools = {
 			}, 'show params'),
 		]),
 		...macroTools(),
-		...(viewTracks().length ? [
+		...(viewPatches().length ? [
 			m('.tool.bottom', {
 				onclick: () => {
 					minimized = !minimized;
@@ -394,13 +394,13 @@ const Tools = {
 	]
 };
 
-/** @param {import('./devPlayer.js').DevTrack} dt */
-const trackStopper = dt => {
-	if (dt.status === 'playing') {
+/** @param {import('./devPlayer.js').DevPatch} dp */
+const patchStopper = dp => {
+	if (dp.status === 'playing') {
 		return m('', {
 			onclick: async () => {
-				await dt.stop();
-				macros.recEvent({ type: 'stop' }, dt);
+				await dp.stop();
+				macros.recEvent({ type: 'stop' }, dp);
 				m.redraw();
 			},
 			style: { display: 'inline', fontWeight: 600 }
@@ -410,9 +410,9 @@ const trackStopper = dt => {
 			onclick: async () => {
 				if (experimentalWarning) alert(experimentalWarning);
 				experimentalWarning = undefined;
-				macros.recEvent({ type: 'start' }, dt);
+				macros.recEvent({ type: 'start' }, dp);
 				editor.updateFiles();
-				await dt.play();
+				await dp.play();
 				m.redraw();
 			},
 			style: { display: 'inline', fontWeight: 600 }
@@ -420,11 +420,11 @@ const trackStopper = dt => {
 	}
 };
 
-/** @param {import('./devPlayer.js').DevTrack} dt */
-const trackClearer = dt => {
-	if (dt.params.length) {
+/** @param {import('./devPlayer.js').DevPatch} dp */
+const patchClearer = dp => {
+	if (dp.params.length) {
 		return [m('', {
-			onclick: () => { dt.params.length = 0; },
+			onclick: () => { dp.params.length = 0; },
 			style: { display: 'inline', fontWeight: 600 }
 		}, '[clear] ')];
 	} else {
@@ -432,28 +432,28 @@ const trackClearer = dt => {
 	}
 };
 
-const applyParamText = (dt, par) => {
+const applyParamText = (dp, par) => {
 	try { par.val = parseParamStr(par.valStr); }
 	catch { console.error('Could not parse param string: '+par.valStr); }
-	if (dt.status === 'playing') {
-		dt.track.setParam(par.name, par.val);
-		macros.recEvent({ type: 'tweak', params: [par] }, dt);
+	if (dp.status === 'playing') {
+		dp.patch.setParam(par.name, par.val);
+		macros.recEvent({ type: 'tweak', params: [par] }, dp);
 	}
 };
 
-/** @param {import('./devPlayer.js').DevTrack} dt */
-const paramTextInput = (dt, par) => [
+/** @param {import('./devPlayer.js').DevPatch} dp */
+const paramTextInput = (dp, par) => [
 	m('input[type="text"]', {
 		value: par.valStr,
-		onkeydown(e) { if (e.key === 'Enter') applyParamText(dt, par); },
+		onkeydown(e) { if (e.key === 'Enter') applyParamText(dp, par); },
 		// input.value gets updated between onkeydown and oninput...
 		oninput(e) { par.valStr = e.target.value; },
-		onblur() { applyParamText(dt, par); }
+		onblur() { applyParamText(dp, par); }
 	}
 )];
 
-/** @param {import('./devPlayer.js').DevTrack} dt */
-const paramSlider = (dt, par) => [
+/** @param {import('./devPlayer.js').DevPatch} dp */
+const paramSlider = (dp, par) => [
 	m('input[type="range"]', {
 		min: par.min,
 		max: par.max,
@@ -461,46 +461,46 @@ const paramSlider = (dt, par) => [
 		value: par.val,
 		oninput(e) { 
 			par.val = e.target.value;
-			if (dt.status === 'playing') {
-				dt.track.setParam(par.name, par.val);
-				macros.recEvent({ type: 'tweak', params: [par] }, dt);
+			if (dp.status === 'playing') {
+				dp.patch.setParam(par.name, par.val);
+				macros.recEvent({ type: 'tweak', params: [par] }, dp);
 			}
 		}
 	}
 )];
 
-/** @param {import('./devPlayer.js').DevTrack} dt */
-const paramInput = (dt, par) => {
-	if (dt.status === 'linked') return [];
-	if (par.valStr) return paramTextInput(dt, par);
-	return paramSlider(dt, par);
+/** @param {import('./devPlayer.js').DevPatch} dp */
+const paramInput = (dp, par) => {
+	if (dp.status === 'linked') return [];
+	if (par.valStr) return paramTextInput(dp, par);
+	return paramSlider(dp, par);
 };
 
-const paramLabel = (dt, par) => {
+const paramLabel = (dp, par) => {
 	let ret = par.name + ': ';
-	if (dt.status === 'linked') return ret + par.valStr;
+	if (dp.status === 'linked') return ret + par.valStr;
 	if (par.valStr) return ret;
 	return ret + Math.round(par.val*1000)/1000;
 };
 
-/** @param {import('./devPlayer.js').DevTrack} dt */
-const ParamsTrack = dt => [
+/** @param {import('./devPlayer.js').DevPatch} dp */
+const ParamsPatch = dp => [
 	m('.params_title', [
-		dt.name,
+		dp.name,
 		m('br'),
-		trackStopper(dt),
-		...trackClearer(dt),
+		patchStopper(dp),
+		...patchClearer(dp),
 	]),
-	...dt.params.map(par =>
+	...dp.params.map(par =>
 		m('.param', [
 			m('', [
 				m('', {
-					onclick: () => dt.params.splice(dt.params.indexOf(par), 1),
+					onclick: () => dp.params.splice(dp.params.indexOf(par), 1),
 					style: { display: 'inline' }
 				}, '[x] '),
-				paramLabel(dt, par)
+				paramLabel(dp, par)
 			]),
-			...paramInput(dt, par)
+			...paramInput(dp, par)
 		])
 	)
 ];
@@ -508,7 +508,7 @@ const ParamsTrack = dt => [
 const ParamsCorner = {
 	view: () => {
 		if (minimized) return [];
-		return viewTracks().map(devTrack => m('.params_track', ParamsTrack(devTrack)));
+		return viewPatches().map(devPatch => m('.params_patch', ParamsPatch(devPatch)));
 	}
 };
 

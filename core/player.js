@@ -1,5 +1,5 @@
-/** @type {Array.<PlayingTrack>} */
-const playingTracks = [];
+/** @type {Array.<PlayingPatch>} */
+const playingPatches = [];
 
 const defaultParamSpec = {
 	name: 'unnamed param?',
@@ -8,7 +8,7 @@ const defaultParamSpec = {
 	def: 0
 };
 
-export class PlayingTrack {
+export class PlayingPatch {
 	constructor({url, processorName, callbacks, audioContext, initParams={}}) {
 		this.url = url;
 		this.processorName = processorName;
@@ -79,9 +79,9 @@ const initContext = wantRate => {
 	return audioContext;
 };
 
-export const createTrack = async ({url, processorName, callbacks, initParams, wantRate=44100}) => {
+export const createPatch = async ({url, processorName, callbacks, initParams, wantRate=44100}) => {
 	let audioContext = initContext(wantRate);
-	const ret = new PlayingTrack({url, processorName, callbacks, audioContext, initParams});
+	const ret = new PlayingPatch({url, processorName, callbacks, audioContext, initParams});
 	await ret.init();
 	if (ret.playResult.type === 'wrong samplerate') {
 		audioContext.close();
@@ -91,17 +91,17 @@ export const createTrack = async ({url, processorName, callbacks, initParams, wa
 	}
 	if (ret.playResult.type !== 'main ready') throw new Error('Error adding node: '+processorName);
 	ret.node.connect(audioContext.destination);
-	playingTracks.push(ret);
+	playingPatches.push(ret);
 	return ret;
 };
 
 /**
- * @param {PlayingTrack} track 
+ * @param {PlayingPatch} patch 
  */
-export const removeTrack = (track, cleanContext=false) => {
-	track.stop();
-	playingTracks.splice(playingTracks.indexOf(track), 1);
-	// if (cleanContext && audioContext && !playingTracks.length) {
+export const removePatch = (patch, cleanContext=false) => {
+	patch.stop();
+	playingPatches.splice(playingPatches.indexOf(patch), 1);
+	// if (cleanContext && audioContext && !playingPatches.length) {
 	// 	audioContext.close();
 	// 	audioContext = undefined;
 	// }

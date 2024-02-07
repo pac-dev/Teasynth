@@ -49,14 +49,14 @@ export const path2proj = projPath => {
  * @param {Project} proj 
  * @param {ProjFile} main 
  */
-const buildTrack = async (proj, main) => {
-	const trackName = 'worklet_' + main.parent.name;
+const buildPatch = async (proj, main) => {
+	const patchName = 'worklet_' + main.parent.name;
 	const sources = {};
 	for (let file of proj.files) {
 		if (file.isDir) continue;
 		sources['file:///' + file.path] = file.content;
 	}
-	sources['file:///export_worklet.js'] = makeWorklet('./'+main.path, './host.js', trackName);
+	sources['file:///export_worklet.js'] = makeWorklet('./'+main.path, './host.js', patchName);
 	const load = async (path) => ({
 		kind: 'module',
 		specifier: path,
@@ -68,7 +68,7 @@ const buildTrack = async (proj, main) => {
 	const compilerOptions = { sourceMap: false, inlineSourceMap: false };
 	console.log(`bundling ${main.parent.path}...`);
 	const { code } = await bundle('/export_worklet.js', { load, compilerOptions });
-	const outFiles = { [trackName+'.js']: code };
+	const outFiles = { [patchName+'.js']: code };
 	const faustSources = [...main.parent.descendants].filter(f => f.name.endsWith('.dsp'));
 	console.log('compiling Faust souces...');
 	for (let f of faustSources) {
@@ -80,21 +80,21 @@ const buildTrack = async (proj, main) => {
 	return outFiles;
 };
 
-export const build = async ({ inDir, outDir, faustOut, wantTracks = [] }) => {
+export const build = async ({ inDir, outDir, faustOut, wantPatches = [] }) => {
 	Deno.mkdirSync(outDir, {recursive: true});
 	console.log('reading input project...');
 	const proj = path2proj(inDir);
 	for (let main of proj.files) {
 		if (main.name !== 'main.js') continue;
 		if (main.path.includes('failed')) continue;
-		const exFiles = await buildTrack(proj, main);
+		const exFiles = await buildPatch(proj, main);
 
 		const tPath = path.join(outDir, main.parent.path);
-		if (!wantTracks.length || wantTracks.includes(main.parent.name)) {
+		if (!wantPatches.length || wantPatches.includes(main.parent.name)) {
 			Deno.mkdirSync(tPath, {recursive: true});
 		}
 		for (let filename of Object.keys(exFiles)) {
-			if (wantTracks.length && filename.endsWith('.js') && !wantTracks.includes(main.parent.name)) {
+			if (wantPatches.length && filename.endsWith('.js') && !wantPatches.includes(main.parent.name)) {
 				continue;
 			}
 			let outPath = (faustOut && filename.match(/(\.wasm|\.json)$/)) ? faustOut : tPath;
