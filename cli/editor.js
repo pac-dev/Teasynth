@@ -34,7 +34,7 @@ const scaredCopy = async (src, dst, yes) => {
 };
 
 export const readConfig = async (args, teaDir) => {
-	const configPath = args['config'] ?? join(teaDir, 'cli/projects.default.json');
+	const configPath = args['config'] ?? join(teaDir, 'cli/config.default.json');
 	const configDir = path.dirname(configPath);
 	const config = JSON.parse(await Deno.readTextFile(configPath));
 	if (args['config']) {

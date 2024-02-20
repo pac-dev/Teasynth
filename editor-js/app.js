@@ -99,7 +99,7 @@ editor.addShortcut('Alt+Digit5', 'Teasynth: Play Line', () => {
 	macros.playLine(editingFile.content.split('\n')[editor.editor.getPosition().lineNumber-1]);
 });
 const patchName2File = (name) => {
-	const file = proj.findByPath(name);
+	const file = proj.findByPath(name) ?? proj.findByPath('patches/'+name);
 	if (!file) return;
 	else if (file.isDir) return file.findChild('main.js');
 	else return file;

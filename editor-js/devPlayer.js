@@ -53,7 +53,7 @@ export class DevPatch {
 	constructor(proj, main) {
 		this.proj = proj;
 		this.main = main;
-		this.name = main.parent.path;
+		this.name = main.parent.path.replace(/^(patches\/)/, '');
 		/** @type {('playing'|'loading'|'stopped'|'linked')} */
 		this.status = 'stopped';
 		this.params = [];
