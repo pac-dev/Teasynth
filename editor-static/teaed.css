@@ -43,7 +43,7 @@ body {
 .tool_pane {
 	text-align: center;
 	display: grid;
-    grid-auto-rows: max-content;
+	grid-auto-rows: max-content;
 	grid-template-columns: 100%;
 	position: relative;
 }
@@ -212,9 +212,9 @@ input.renamer.renaming {
 	bottom: 0;
 	right: 10rem;
 	pointer-events: none;
-    overflow-x: auto;
-    white-space: nowrap;
-    max-width: calc(100% - 10rem);
+	overflow-x: auto;
+	white-space: nowrap;
+	max-width: calc(100% - 10rem);
 }
 .params_patch {
 	background-color: #c5c5de;
