@@ -116,7 +116,7 @@ class PatchHandle {
 	constructor() {
 		const modulePath = path.fromFileUrl(import.meta.url);
 		const command = new Deno.Command(Deno.execPath(), {
-			args: ['run', '-A', '--unstable', modulePath],
+			args: ['run', '-A', modulePath],
 			stdin: 'piped', stdout: 'piped'
 		});
 		this.proc = command.spawn();

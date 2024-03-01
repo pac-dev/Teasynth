@@ -104,11 +104,12 @@ export const generateEditor = async (config, teaDir, outDir, yes) => {
 	}
 	if (config.pwa) {
 		const paths = [];
+		const sep = path.SEPARATOR;
 		for (const entry of walkSync(outDir)) {
 			if (!entry.isFile) continue;
 			let rel = path.relative(outDir, entry.path);
 			if (rel === 'index.html') rel = ''
-			if (path.sep !== '/') rel = rel.replaceAll(path.sep, '/');
+			if (sep !== '/') rel = rel.replaceAll(sep, '/');
 			paths.push('./' + rel);
 		}
 		const svcPath = join(outDir, 'importctrl.js');
