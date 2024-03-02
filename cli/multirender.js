@@ -1,5 +1,4 @@
 import { loadPatch } from './render.js';
-import { path } from './deps.js';
 
 const parseParamStr = (str) => Function(`"use strict"; return parseFloat(${str})`)();
 // Buffer size determines timing accuracy when patches and parameters change.
@@ -114,9 +113,8 @@ export class MultiRenderer {
  */
 class PatchHandle {
 	constructor() {
-		const modulePath = path.fromFileUrl(import.meta.url);
 		const command = new Deno.Command(Deno.execPath(), {
-			args: ['run', '-A', modulePath],
+			args: ['run', '-A', import.meta.url],
 			stdin: 'piped', stdout: 'piped'
 		});
 		this.proc = command.spawn();
