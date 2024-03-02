@@ -7,6 +7,8 @@ import { renderMacro } from './cli/rendermacro.js';
 
 const helpText = `
 Teasynth command line.
+
+Optionally install with: deno install -A teasynth.js
 If installed, invoke with: teasynth
 Otherwise, use: deno run -A teasynth.js
 
@@ -19,9 +21,9 @@ Arguments:
     OUTFILE         path to the output audio file
     -t=DURATION     seconds of audio to render, default 10
     --p-PARAM=X     set value of patch parameter PARAM to X
-Example 1: teasynth render projects/startup/1-welcome/main.js test.js
+Example 1: teasynth render projects/startup/1-welcome/main.js test.wav
     Renders the included test file for the default 10 seconds
-Example 2: teasynth render example/main.js --p-lopass=500 --p-hipass=900
+Example 2: teasynth render example/main.js test.wav --p-lopass=500 --p-hipass=900
     Renders an example patch with values for parameters "lopass" and "hipass"
 
 SUBCOMMAND: BUILD
@@ -33,7 +35,7 @@ Arguments:
     OUTDIR          path to output directory
     --patch=X       only build specified patches
 Example 1: teasynth build projects/startup/ bundles/
-    Build all patches in the included test project
+    Build all patches in the included test project to the "bundles" folder
 Example 2: teasynth build example/ bundles/ --patch=bell --patch=whistle
     Build only "bell" and "whistle" patches of an example project
 
