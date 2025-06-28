@@ -65,7 +65,7 @@ const extractStamp = (line) => {
 const rec = (f) => {
 	if (status === 'playing') {
 		if (timeoutId !== -1) {
-			window.clearTimeout(timeoutId);
+			globalThis.clearTimeout(timeoutId);
 			timeoutId = -1;
 		}
 		macroEvents.setHighlight(tgtFile);
@@ -75,7 +75,7 @@ const rec = (f) => {
 	}
 	tgtFile = f;
 	startDate = new Date();
-	intervalId = window.setInterval(checkStreak, 600);
+	intervalId = globalThis.setInterval(checkStreak, 600);
 	status = 'recording';
 };
 
@@ -111,11 +111,11 @@ const stop = () => {
 	if (status === 'stopped') return;
 	if (status === 'recording') checkStreak(true);
 	if (intervalId !== -1) {
-		window.clearInterval(intervalId);
+		globalThis.clearInterval(intervalId);
 		intervalId = -1;
 	}
 	if (timeoutId !== -1) {
-		window.clearTimeout(timeoutId);
+		globalThis.clearTimeout(timeoutId);
 		timeoutId = -1;
 	}
 	status = 'stopped';
@@ -267,7 +267,7 @@ const playUsingTimer = () => {
 		rec(tgtFile);
 		macroEvents.statusChanged();
 	}
-	timeoutId = window.setTimeout(playUsingTimer, nextStamp - nowStamp);
+	timeoutId = globalThis.setTimeout(playUsingTimer, nextStamp - nowStamp);
 };
 
 export const playUpToStamp = (content, playStamp) => {
@@ -368,4 +368,4 @@ const reStamp = (fn) => {
 
 export const macroStatus = () => status;
 export const macros = { rec, play, pause, resume, stop, recEvent, getCursor, setCursor, playLine, reStamp };
-window.tm = macros;
+globalThis.tm = macros;
